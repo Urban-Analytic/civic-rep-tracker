@@ -318,18 +318,26 @@ function fillChi() {
     }
     return { ...p, _wardNum: wardNum };
   });
+  // Deduplicate by person ID, keeping the one with a ward number
+  const seen = new Map();
+  withWard.forEach(p => {
+    if (!p.id || !p.name) return;
+    if (!seen.has(p.id) || (p._wardNum && !seen.get(p.id)._wardNum)) {
+      seen.set(p.id, p);
+    }
+  });
+  const deduped = [...seen.values()];
   // Sort by ward number
-  withWard.sort((a,b) => (a._wardNum || 999) - (b._wardNum || 999));
+  deduped.sort((a,b) => (a._wardNum || 999) - (b._wardNum || 999));
 
   sel.innerHTML = '<option value="">— Select your alder —</option>';
-  withWard.forEach((p, i) => {
-    if (!p.name) return;
+  deduped.forEach((p, i) => {
     const o = document.createElement('option');
     o.value = i;
     o.textContent = (p._wardNum ? 'Ward ' + p._wardNum + '  ·  ' : '') + p.name;
     sel.appendChild(o);
   });
-  D._chi_sorted = withWard;
+  D._chi_sorted = deduped;
 }
 
 function switchCity(c) {
@@ -359,57 +367,66 @@ function showNYC() {
   const name     = personName(member);
   const district = personDistrict(member);
 
-  // Match committees: try by name first, then by district
+  // Debug: log the actual field names so we can see what's there
+  if (D.nyc_committees[0]) console.log('Committee record keys:', Object.keys(D.nyc_committees[0]), 'Sample:', D.nyc_committees[0]);
+  if (D.nyc_meetings[0])   console.log('Meeting record keys:', Object.keys(D.nyc_meetings[0]), 'Sample:', D.nyc_meetings[0]);
+
+  // Match committees: try every text field in each record for the member's name or last name
+  const lastName = name.split(' ').pop().toLowerCase();
+  const nameLower = name.toLowerCase();
   let myComms = D.nyc_committees.filter(c => {
-    const cmn = committeeMemberName(c);
-    if (cmn && cmn.toLowerCase() === name.toLowerCase()) return true;
-    // Also try matching if name is in "Last, First" format
-    if (cmn && name.includes(' ')) {
-      const parts = name.split(' ');
-      const last = parts[parts.length - 1];
-      if (cmn.toLowerCase().includes(last.toLowerCase())) return true;
-    }
-    return false;
+    // Search across ALL string values in the record for this member's name
+    const vals = Object.values(c).map(v => String(v).toLowerCase());
+    return vals.some(v => v === nameLower || v.includes(nameLower) || v.includes(lastName));
   });
-  // If no matches by name, try by district
+  // If still no matches, try by district number across all fields
   if (myComms.length === 0 && district) {
     myComms = D.nyc_committees.filter(c => {
-      const cd = committeeMemberDistrict(c);
-      return cd && String(cd) === String(district);
+      const vals = Object.values(c).map(v => String(v));
+      return vals.some(v => v === String(district));
     });
   }
-  // Dedup
+  // Dedup by committee name
   const commMap = new Map();
   myComms.forEach(c => {
     const cn = committeeName(c);
     if (!commMap.has(cn)) commMap.set(cn, committeeRole(c));
   });
 
-  const now = new Date();
-  const ago30 = new Date(now - 30 * 864e5);
-
-  // Meetings: show ALL council meetings (not filtered per member)
-  const upcoming = D.nyc_meetings
-    .filter(m => { const d = meetingDate(m); return d && new Date(d) >= now; })
-    .sort((a,b) => new Date(meetingDate(a)) - new Date(meetingDate(b)))
-    .slice(0, 20);
-
-  const recent = D.nyc_meetings
-    .filter(m => { const d = meetingDate(m); return d && new Date(d) < now && new Date(d) > ago30; })
-    .sort((a,b) => new Date(meetingDate(b)) - new Date(meetingDate(a)))
-    .slice(0, 20);
-
-  // If no meetings in 30 days, expand to 90 days
-  let recentLabel = 'Recent meetings (30 days)';
-  let recentList = recent;
-  if (recent.length === 0) {
-    const ago90 = new Date(now - 90 * 864e5);
-    recentList = D.nyc_meetings
-      .filter(m => { const d = meetingDate(m); return d && new Date(d) < now && new Date(d) > ago90; })
-      .sort((a,b) => new Date(meetingDate(b)) - new Date(meetingDate(a)))
-      .slice(0, 20);
-    if (recentList.length > 0) recentLabel = 'Recent meetings (90 days)';
+  // Meetings: find any date-like field and use it
+  // First, figure out which field holds the date
+  let dateKey = null;
+  if (D.nyc_meetings[0]) {
+    const keys = Object.keys(D.nyc_meetings[0]);
+    dateKey = keys.find(k => k.toLowerCase().includes('date'));
+    if (!dateKey) dateKey = keys.find(k => {
+      const v = D.nyc_meetings[0][k];
+      return typeof v === 'string' && v.match(/^\d{4}-\d{2}/);
+    });
+    console.log('Meeting date field:', dateKey);
   }
+
+  const now = new Date();
+
+  // Get the date from a meeting using the discovered key
+  function mDate(m) {
+    const v = dateKey ? m[dateKey] : meetingDate(m);
+    return v ? new Date(v) : null;
+  }
+
+  // Get the name/title from a meeting — try all plausible fields
+  function mName(m) {
+    return meetingName(m);
+  }
+
+  const allMeetings = D.nyc_meetings.filter(m => mDate(m));
+  const upcoming = allMeetings.filter(m => mDate(m) >= now)
+    .sort((a,b) => mDate(a) - mDate(b)).slice(0, 20);
+  
+  // Recent: try 30d, then 90d, then just show latest 20
+  let recentLabel = 'Recent meetings';
+  let recentList = allMeetings.filter(m => mDate(m) < now)
+    .sort((a,b) => mDate(b) - mDate(a)).slice(0, 20);
 
   let html = '';
 
@@ -426,10 +443,10 @@ function showNYC() {
     html += `</div></div>`;
   }
 
-  // 2-col: upcoming | recent
+  // 2-col: upcoming | recent (using discovered date key)
   html += `<div class="grid2">`;
-  html += evtCol('Upcoming meetings', upcoming, true);
-  html += evtCol(recentLabel, recentList, false);
+  html += evtColRaw('Upcoming meetings', upcoming, dateKey, true);
+  html += evtColRaw(recentLabel, recentList, dateKey, false);
   html += `</div>`;
 
   html += `<div class="foot-note">DATA: <a href="https://data.cityofnewyork.us" target="_blank">NYC OPEN DATA</a> · <a href="https://legistar.council.nyc.gov" target="_blank">LEGISTAR</a></div>`;
@@ -519,9 +536,13 @@ async function showChi() {
   if (showBills.length === 0) {
     html += `<div class="empty">No legislation found</div>`;
   } else {
-    showBills.forEach(b => {
+    showBills.forEach((b, bi) => {
       const pillCls = statusPill(b.classification);
-      html += `<div class="row" onclick="toggleBillDetail(this, '${city}', '${(b.id||'').replace(/'/g,"\\'")}', '${(b.identifier||'').replace(/'/g,"\\'")}')">
+      // Store bill data in a global array to avoid escaping issues in onclick
+      const billIdx = window._billData ? window._billData.length : 0;
+      if (!window._billData) window._billData = [];
+      window._billData.push({ id: b.id, identifier: b.identifier, city: city });
+      html += `<div class="row" onclick="toggleBillDetail(this, ${billIdx})">
         <div class="row-id">${b.identifier||'—'}<span class="pill ${pillCls.c}">${pillCls.t}</span></div>
         <div class="row-title">${(b.title||'').slice(0,200)}${(b.title||'').length>200?'…':''}</div>
         <div class="row-date">${fmtDate(b.updated_at)}</div>
@@ -561,7 +582,7 @@ async function showChi() {
 // ════════════════════════════════════════════════════
 // CLICKABLE BILL DETAIL
 // ════════════════════════════════════════════════════
-async function toggleBillDetail(rowEl, whichCity, billId, identifier) {
+async function toggleBillDetail(rowEl, billIdx) {
   // If detail panel already open, close it
   const existing = rowEl.nextElementSibling;
   if (existing && existing.classList.contains('bill-detail')) {
@@ -572,6 +593,11 @@ async function toggleBillDetail(rowEl, whichCity, billId, identifier) {
   // Remove any other open detail panels
   document.querySelectorAll('.bill-detail').forEach(el => el.remove());
 
+  const billData = window._billData[billIdx];
+  if (!billData) return;
+
+  const { id: billId, identifier, city: whichCity } = billData;
+
   // Create loading placeholder
   const panel = document.createElement('div');
   panel.className = 'bill-detail';
@@ -580,11 +606,13 @@ async function toggleBillDetail(rowEl, whichCity, billId, identifier) {
 
   if (whichCity === 'chi' && billId) {
     try {
+      // Escape the bill ID for SQL (OCD IDs contain slashes and special chars)
+      const escapedId = billId.replace(/'/g, "''");
       const actions = await chiSQL(
-        `SELECT ba.description, ba.date, ba.classification, ba.order
+        `SELECT ba.description, ba.date, ba.classification, ba."order"
          FROM billaction ba
-         WHERE ba.bill_id = '${billId}'
-         ORDER BY ba.order ASC, ba.date ASC
+         WHERE ba.bill_id = '${escapedId}'
+         ORDER BY ba."order" ASC, ba.date ASC
          LIMIT 20`
       );
 
@@ -647,6 +675,35 @@ function evtCol(title, events, isUpcoming) {
         <div>
           <div class="evt-name">${meetingName(m)}${isUpcoming?'<span class="pill pill-up">upcoming</span>':''}</div>
           <div class="evt-sub">${meetingLocation(m)} ${meetingStatus(m)?'· '+meetingStatus(m):''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  return html;
+}
+
+// Version that uses a discovered date key directly
+function evtColRaw(title, events, dateKey, isUpcoming) {
+  let html = `<div class="col"><div class="col-head">${title} <span class="col-count">${events.length}</span></div>`;
+  if (events.length === 0) {
+    html += `<div class="empty">None found in dataset</div>`;
+  } else {
+    events.forEach(m => {
+      const dStr = dateKey ? m[dateKey] : meetingDate(m);
+      const d = dStr ? new Date(dStr) : null;
+      // Find best name field — try all keys for something name-like
+      const nameVal = meetingName(m);
+      const locVal = meetingLocation(m);
+      const statusVal = meetingStatus(m);
+      html += `<div class="evt-row">
+        <div>
+          <div class="evt-day">${d ? d.getDate() : '?'}</div>
+          <div class="evt-mon">${d ? d.toLocaleString('en-US',{month:'short'}) : ''}</div>
+        </div>
+        <div>
+          <div class="evt-name">${nameVal}${isUpcoming?'<span class="pill pill-up">upcoming</span>':''}</div>
+          <div class="evt-sub">${locVal} ${statusVal?'· '+statusVal:''}</div>
         </div>
       </div>`;
     });
