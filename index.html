@@ -82,7 +82,7 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
 </style>
 </head>
 <body>
- 
+
 <div class="masthead">
   <div>
     <div class="masthead-title">Rep<span>Tracker</span></div>
@@ -90,7 +90,7 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
   </div>
   <div class="masthead-date" id="today"></div>
 </div>
- 
+
 <div class="wrap">
   <div class="search-panel">
     <div class="city-tabs">
@@ -102,11 +102,11 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
     </select>
     <button class="btn-go" id="go" disabled onclick="go()">View →</button>
   </div>
- 
+
   <div class="status-bar" id="statusbar"></div>
   <div id="result"></div>
 </div>
- 
+
 <script>
 // ════════════════════════════════════════════════════
 // CONFIG
@@ -115,17 +115,17 @@ const NYC_MEMBERS    = 'https://data.cityofnewyork.us/resource/uvw5-9znb.json?$l
 const NYC_COMMITTEES = 'https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000';
 const NYC_MEETINGS   = 'https://data.cityofnewyork.us/resource/m48u-yjt8.json?$limit=200&$order=meeting_date%20DESC';
 const CHI            = 'https://puddle.datamade.us/chicago_council';
- 
+
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
 let city = 'nyc';
 let D = { nyc_members:[], nyc_committees:[], nyc_meetings:[], chi_persons:[] };
 let endpoints = {};
- 
+
 document.getElementById('today').textContent =
   new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
- 
+
 // ════════════════════════════════════════════════════
 // SMART FIELD FINDER
 //   Instead of guessing field names, we search for
@@ -142,15 +142,17 @@ function findField(obj, ...hints) {
   }
   return null;
 }
- 
+
 function getField(obj, ...hints) {
   const key = findField(obj, ...hints);
   return key ? obj[key] : null;
 }
- 
+
 // Get the "name" of a person record, trying many possible field names
 function personName(rec) {
-  return getField(rec, 'council_member', 'person_name', 'name', 'full_name', 'member_name', 'first_name')
+  // Check 'name' exactly first, then fall back to partial matches
+  if (rec.name) return rec.name;
+  return getField(rec, 'full_name', 'person_name', 'member_name', 'council_member')
     || 'Unknown';
 }
 function personDistrict(rec) {
@@ -165,7 +167,7 @@ function personPhone(rec) {
 function personBorough(rec) {
   return getField(rec, 'borough', 'boro') || '';
 }
- 
+
 function committeeName(rec) {
   return getField(rec, 'committee_name', 'committee', 'body_name', 'name') || 'Committee';
 }
@@ -175,7 +177,7 @@ function committeeMemberName(rec) {
 function committeeRole(rec) {
   return getField(rec, 'role', 'title', 'position') || 'Member';
 }
- 
+
 function meetingName(rec) {
   return getField(rec, 'committee_name', 'meeting_name', 'name', 'body_name', 'event_name') || 'Council Meeting';
 }
@@ -188,7 +190,7 @@ function meetingLocation(rec) {
 function meetingStatus(rec) {
   return getField(rec, 'meeting_status', 'status', 'agenda_status') || '';
 }
- 
+
 // ════════════════════════════════════════════════════
 // BOOT — LOAD ALL DATA
 // ════════════════════════════════════════════════════
@@ -200,16 +202,16 @@ async function boot() {
     { id:'chi-persons',    label:'CHI persons',    fn: () => jfetch(CHI+'/person.json?_shape=array&_size=100&_sort=name') },
     { id:'chi-events',     label:'CHI events',     fn: () => jfetch(CHI+'/event.json?_shape=array&_size=2&_sort_desc=start_date') },
   ];
- 
+
   // Show status dots
   const bar = document.getElementById('statusbar');
   bar.innerHTML = tests.map(t =>
     `<span class="status-item"><span class="dot dot-wait" id="dot-${t.id}"></span>${t.label}</span>`
   ).join('');
- 
+
   // Fire all in parallel
   const results = await Promise.allSettled(tests.map(t => t.fn()));
- 
+
   results.forEach((r, i) => {
     const dot = document.getElementById('dot-' + tests[i].id);
     if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
@@ -218,23 +220,23 @@ async function boot() {
       dot.className = 'dot dot-err';
     }
   });
- 
+
   // Store data
   D.nyc_members    = results[0].status === 'fulfilled' ? results[0].value : [];
   D.nyc_committees = results[1].status === 'fulfilled' ? results[1].value : [];
   D.nyc_meetings   = results[2].status === 'fulfilled' ? results[2].value : [];
   D.chi_persons    = results[3].status === 'fulfilled' ? results[3].value : [];
- 
+
   // Log first record of each for debugging (open browser console to see)
   if (D.nyc_members[0])    console.log('NYC member fields:', Object.keys(D.nyc_members[0]), D.nyc_members[0]);
   if (D.nyc_committees[0]) console.log('NYC committee fields:', Object.keys(D.nyc_committees[0]), D.nyc_committees[0]);
   if (D.nyc_meetings[0])   console.log('NYC meeting fields:', Object.keys(D.nyc_meetings[0]), D.nyc_meetings[0]);
   if (D.chi_persons[0])    console.log('CHI person fields:', Object.keys(D.chi_persons[0]), D.chi_persons[0]);
- 
+
   // Populate select
   if (city === 'nyc') fillNYC(); else fillChi();
 }
- 
+
 // ════════════════════════════════════════════════════
 // DROPDOWNS
 // ════════════════════════════════════════════════════
@@ -244,18 +246,26 @@ function fillNYC() {
     sel.innerHTML = '<option value="">NYC data unavailable — try Chicago</option>';
     return;
   }
-  const sorted = [...D.nyc_members].sort((a,b) => personName(a).localeCompare(personName(b)));
+  // Deduplicate by name (multiple terms create duplicate rows)
+  const seen = new Map();
+  D.nyc_members.forEach(m => {
+    const n = personName(m);
+    if (!seen.has(n) || (m.term_start && (!seen.get(n).term_start || m.term_start > seen.get(n).term_start))) {
+      seen.set(n, m);
+    }
+  });
+  const sorted = [...seen.values()].sort((a,b) => personName(a).localeCompare(personName(b)));
   sel.innerHTML = '<option value="">— Select your council member —</option>';
   sorted.forEach((m, i) => {
     const o = document.createElement('option');
     o.value = i;
-    o.textContent = personName(m) + (personDistrict(m) ? '  ·  Dist. ' + personDistrict(m) : '');
+    const d = personDistrict(m);
+    o.textContent = personName(m) + (d ? '  ·  District ' + d : '');
     sel.appendChild(o);
   });
-  // Store sorted for lookup
   D._nyc_sorted = sorted;
 }
- 
+
 function fillChi() {
   const sel = document.getElementById('sel');
   if (!D.chi_persons.length) {
@@ -271,7 +281,7 @@ function fillChi() {
     sel.appendChild(o);
   });
 }
- 
+
 function switchCity(c) {
   city = c;
   document.getElementById('tab-nyc').classList.toggle('active', c === 'nyc');
@@ -280,26 +290,26 @@ function switchCity(c) {
   document.getElementById('go').disabled = true;
   if (c === 'nyc') fillNYC(); else fillChi();
 }
- 
+
 // ════════════════════════════════════════════════════
 // GO — SHOW REP DATA
 // ════════════════════════════════════════════════════
 function go() {
   if (city === 'nyc') showNYC(); else showChi();
 }
- 
+
 // ═══════ NYC ═══════
 function showNYC() {
   const idx = +document.getElementById('sel').value;
   const member = D._nyc_sorted[idx];
   if (!member) return;
- 
+
   const name     = personName(member);
   const district = personDistrict(member);
   const email    = personEmail(member);
   const phone    = personPhone(member);
   const borough  = personBorough(member);
- 
+
   // Match committees
   const myComms = D.nyc_committees.filter(c =>
     committeeMemberName(c).toLowerCase() === name.toLowerCase()
@@ -310,28 +320,28 @@ function showNYC() {
     const cn = committeeName(c);
     if (!commMap.has(cn)) commMap.set(cn, committeeRole(c));
   });
- 
+
   const now = new Date();
   const ago30 = new Date(now - 30 * 864e5);
- 
+
   const upcoming = D.nyc_meetings
     .filter(m => { const d = meetingDate(m); return d && new Date(d) >= now; })
     .sort((a,b) => new Date(meetingDate(a)) - new Date(meetingDate(b)))
     .slice(0, 20);
- 
+
   const recent = D.nyc_meetings
     .filter(m => { const d = meetingDate(m); return d && new Date(d) < now && new Date(d) > ago30; })
     .sort((a,b) => new Date(meetingDate(b)) - new Date(meetingDate(a)))
     .slice(0, 20);
- 
+
   let html = '';
- 
+
   // Header
   html += repHeader(name,
     `NYC Council Member${district ? ' · District '+district : ''}${borough ? ' · '+borough : ''}`,
     email, phone,
     [[commMap.size, 'Committees'], [upcoming.length, 'Upcoming'], [recent.length, 'Recent (30d)']]);
- 
+
   // Committees
   if (commMap.size > 0) {
     html += `<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${commMap.size}</span></div>`;
@@ -341,30 +351,30 @@ function showNYC() {
     });
     html += `</div></div>`;
   }
- 
+
   // 2-col: upcoming | recent
   html += `<div class="grid2">`;
   html += evtCol('Upcoming meetings', upcoming, true);
   html += evtCol('Recent meetings (30 days)', recent, false);
   html += `</div>`;
- 
+
   html += `<div class="foot-note">DATA: <a href="https://data.cityofnewyork.us" target="_blank">NYC OPEN DATA</a> · <a href="https://legistar.council.nyc.gov" target="_blank">LEGISTAR</a></div>`;
- 
+
   document.getElementById('result').innerHTML = html;
 }
- 
+
 // ═══════ CHICAGO ═══════
 async function showChi() {
   const idx = +document.getElementById('sel').value;
   const person = D.chi_persons[idx];
   if (!person) return;
- 
+
   const personId = person.id;
   const name = person.name || 'Unknown';
- 
+
   document.getElementById('result').innerHTML =
     `<div class="loading-box"><div class="spin"></div><div class="load-text">Loading ${name}…</div></div>`;
- 
+
   // Fetch bills + events + memberships for this person
   let bills = [], events = [], comms = [];
   try {
@@ -374,14 +384,14 @@ async function showChi() {
       ORDER BY b.updated_at DESC LIMIT 30`;
     bills = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
   } catch(e) { console.warn('CHI bills error:', e); }
- 
+
   try {
     const q = `SELECT e.name, e.start_date, e.status, e.location, o.name as org_name
       FROM event e JOIN organization o ON o.id = e.organization_id
       ORDER BY e.start_date DESC LIMIT 60`;
     events = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
   } catch(e) { console.warn('CHI events error:', e); }
- 
+
   try {
     const q = `SELECT DISTINCT o.name, m.role
       FROM membership m JOIN organization o ON o.id = m.organization_id
@@ -389,24 +399,24 @@ async function showChi() {
       LIMIT 25`;
     comms = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
   } catch(e) { console.warn('CHI comms error:', e); }
- 
+
   const now = new Date();
   const ago30 = new Date(now - 30 * 864e5);
- 
+
   const recentBills = bills.filter(b => b.updated_at && new Date(b.updated_at) > ago30);
   const showBills = recentBills.length > 0 ? recentBills : bills.slice(0,12);
   const billLabel = recentBills.length > 0 ? 'Legislation (last 30 days)' : 'Legislation on record';
- 
+
   const upcoming = events.filter(e => e.start_date && new Date(e.start_date) >= now)
     .sort((a,b) => new Date(a.start_date) - new Date(b.start_date)).slice(0,20);
   const recent = events.filter(e => e.start_date && new Date(e.start_date) < now && new Date(e.start_date) > ago30)
     .sort((a,b) => new Date(b.start_date) - new Date(a.start_date)).slice(0,20);
- 
+
   let html = '';
- 
+
   html += repHeader(name, 'Chicago Alder · City Council', '', '',
     [[bills.length, 'Bills total'], [recentBills.length, 'Bills (30d)'], [upcoming.length, 'Upcoming']]);
- 
+
   // Committees
   if (comms.length > 0) {
     html += `<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${comms.length}</span></div>`;
@@ -416,10 +426,10 @@ async function showChi() {
     });
     html += `</div></div>`;
   }
- 
+
   // 2-col: bills | events
   html += `<div class="grid2">`;
- 
+
   // Bills
   html += `<div class="col"><div class="col-head">${billLabel} <span class="col-count">${showBills.length}</span></div>`;
   if (showBills.length === 0) {
@@ -435,7 +445,7 @@ async function showChi() {
     });
   }
   html += `</div>`;
- 
+
   // Events
   const allEvts = [...upcoming, ...recent];
   html += `<div class="col"><div class="col-head">Meetings & events <span class="col-count">${allEvts.length}</span></div>`;
@@ -458,12 +468,12 @@ async function showChi() {
     });
   }
   html += `</div></div>`;
- 
+
   html += `<div class="foot-note">DATA: <a href="https://chicago.councilmatic.org" target="_blank">CHICAGO COUNCILMATIC</a> · <a href="https://puddle.datamade.us/chicago_council" target="_blank">DATAMADE</a></div>`;
- 
+
   document.getElementById('result').innerHTML = html;
 }
- 
+
 // ════════════════════════════════════════════════════
 // SHARED RENDERING
 // ════════════════════════════════════════════════════
@@ -481,7 +491,7 @@ function repHeader(name, subtitle, email, phone, stats) {
     ).join('')}</div>
   </div>`;
 }
- 
+
 function evtCol(title, events, isUpcoming) {
   let html = `<div class="col"><div class="col-head">${title} <span class="col-count">${events.length}</span></div>`;
   if (events.length === 0) {
@@ -505,7 +515,7 @@ function evtCol(title, events, isUpcoming) {
   html += `</div>`;
   return html;
 }
- 
+
 // ════════════════════════════════════════════════════
 // UTILS
 // ════════════════════════════════════════════════════
@@ -515,23 +525,23 @@ async function jfetch(url) {
   const data = await r.json();
   return Array.isArray(data) ? data : [];
 }
- 
+
 function initials(n) {
   return (n||'?').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
- 
+
 function fmtDate(s) {
   if (!s) return '—';
   try { return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
   catch { return s; }
 }
- 
+
 function statusPill(cls) {
   const s = (cls||'').toLowerCase();
   if (s.includes('pass')||s.includes('enact')||s.includes('approv')) return {c:'pill-pass',t:cls};
   return {c:'pill-pend',t:cls||'Filed'};
 }
- 
+
 boot();
 </script>
 </body>
