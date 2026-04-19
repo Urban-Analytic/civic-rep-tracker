@@ -3,858 +3,535 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Rep Tracker — NYC & Chicago</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<title>RepTracker — NYC & Chicago</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root {
-  --ink: #0e0e0c;
-  --paper: #f5f2eb;
-  --card: #fdfcf8;
-  --rule: #d6d1c4;
-  --accent: #c0392b;
-  --accent2: #1a3a5c;
-  --muted: #7a7568;
-  --tag-bg: #e8e3d8;
-  --pass: #1a5c2a;
-  --pass-bg: #d4f0dc;
-  --pend: #6b4c00;
-  --pend-bg: #fdf0c2;
-  --up: #1a3a5c;
-  --up-bg: #d6e8f8;
-  --fail: #7a1a1a;
-  --fail-bg: #f5d5d5;
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
-body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: 'Barlow', sans-serif;
-  font-weight: 300;
-  min-height: 100vh;
-}
-
-/* ── MASTHEAD ── */
-.masthead {
-  border-bottom: 3px double var(--rule);
-  padding: 1.5rem 2rem 1.2rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: 1rem;
-}
-.masthead-title {
-  font-family: 'Libre Baskerville', serif;
-  font-size: 2rem;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-.masthead-title span { color: var(--accent); }
-.masthead-sub {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin-top: 4px;
-}
-.masthead-date {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--muted);
-  text-align: right;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-/* ── LAYOUT ── */
-.wrap { max-width: 980px; margin: 0 auto; padding: 0 1.5rem 4rem; }
-
-/* ── SEARCH PANEL ── */
-.search-panel {
-  border-bottom: 1px solid var(--rule);
-  padding: 1.25rem 0;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-}
-.city-tabs { display: flex; gap: 0; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
-.city-tab {
-  padding: 6px 18px;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  border: none;
-  background: var(--card);
-  color: var(--muted);
-  transition: background 0.15s, color 0.15s;
-}
-.city-tab.active { background: var(--ink); color: white; }
-.search-select {
-  flex: 1;
-  min-width: 200px;
-  padding: 8px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--card);
-  font-family: 'Barlow', sans-serif;
-  font-size: 0.875rem;
-  color: var(--ink);
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7568'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  cursor: pointer;
-}
-.search-select:focus { outline: 2px solid var(--accent2); outline-offset: 1px; }
-.btn-go {
-  padding: 8px 24px;
-  background: var(--ink);
-  color: white;
-  border: none;
-  border-radius: 3px;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: background 0.15s;
-  white-space: nowrap;
-}
-.btn-go:hover { background: var(--accent2); }
-.btn-go:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ── DIAGNOSTIC ── */
-.diag-bar {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--muted);
-  padding: 6px 0;
-  border-bottom: 1px solid var(--rule);
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  letter-spacing: 0.04em;
-}
-.diag-item { display: flex; align-items: center; gap: 5px; }
-.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.dot-ok   { background: #2ecc71; }
-.dot-err  { background: var(--accent); }
-.dot-wait { background: #ccc; animation: pulse 1s infinite; }
-@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
-
-/* ── REP HEADER ── */
-.rep-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: 1.25rem;
-  padding: 1.5rem 0 1.25rem;
-  border-bottom: 2px solid var(--ink);
-}
-.rep-initial {
-  width: 52px; height: 52px;
-  border: 2px solid var(--ink);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Libre Baskerville', serif;
-  font-size: 1.2rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.rep-name {
-  font-family: 'Libre Baskerville', serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-.rep-sub {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin-top: 5px;
-}
-.rep-contact { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
-.rep-contact a { color: var(--accent2); text-decoration: none; }
-.rep-contact a:hover { text-decoration: underline; }
-.rep-stats { display: flex; gap: 1.5rem; align-items: flex-start; text-align: right; }
-.rep-stat-n { font-family: 'Libre Baskerville', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; color: var(--accent2); }
-.rep-stat-l { font-family: 'DM Mono', monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 3px; }
-
-/* ── CONTENT GRID ── */
-.content-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-  border-top: 1px solid var(--rule);
-}
-.col { border-right: 1px solid var(--rule); }
-.col:last-child { border-right: none; }
-.col-head {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  padding: 0.9rem 1.2rem 0.5rem;
-  border-bottom: 1px solid var(--rule);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.col-count {
-  background: var(--tag-bg);
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 0.6rem;
-}
-
-/* ── BILL ROW ── */
-.bill-row {
-  padding: 0.8rem 1.2rem;
-  border-bottom: 1px solid var(--rule);
-  transition: background 0.1s;
-  cursor: default;
-}
-.bill-row:hover { background: #f0ece3; }
-.bill-row:last-child { border-bottom: none; }
-.bill-id {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.68rem;
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  margin-bottom: 3px;
-}
-.bill-title { font-size: 0.82rem; font-weight: 400; line-height: 1.45; color: var(--ink); }
-.bill-date  { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--muted); margin-top: 5px; }
-.pill {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: 2px;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.6rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-.pill-pass { background: var(--pass-bg); color: var(--pass); }
-.pill-pend { background: var(--pend-bg); color: var(--pend); }
-.pill-up   { background: var(--up-bg);   color: var(--up); }
-.pill-fail { background: var(--fail-bg); color: var(--fail); }
-.pill-comm { background: var(--tag-bg);  color: var(--ink); }
-
-/* ── EVENT ROW ── */
-.evt-row {
-  padding: 0.8rem 1.2rem;
-  border-bottom: 1px solid var(--rule);
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 0.75rem;
-  align-items: start;
-  transition: background 0.1s;
-}
-.evt-row:hover { background: #f0ece3; }
-.evt-row:last-child { border-bottom: none; }
-.evt-date-block { text-align: center; }
-.evt-day  { font-family: 'Libre Baskerville', serif; font-size: 1.3rem; font-weight: 700; line-height: 1; }
-.evt-mon  { font-family: 'DM Mono', monospace; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-.evt-name { font-size: 0.82rem; font-weight: 500; line-height: 1.4; }
-.evt-sub  { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--muted); margin-top: 3px; }
-
-/* ── FULL-WIDTH SECTION ── */
-.full-col { border-top: 1px solid var(--rule); }
-.full-col .col-head { grid-column: 1/-1; }
-.committee-grid {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  padding: 1rem 1.2rem;
-}
-.committee-tag {
-  padding: 5px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  font-size: 0.78rem;
-  background: var(--card);
-  display: flex; align-items: center; gap: 6px;
-}
-.committee-role { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); text-transform: uppercase; }
-
-/* ── STATES ── */
-.state-box {
-  padding: 3rem 2rem;
-  text-align: center;
-  color: var(--muted);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-.spin {
-  display: inline-block;
-  width: 18px; height: 18px;
-  border: 2px solid var(--rule);
-  border-top-color: var(--ink);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin-bottom: 10px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.err-box {
-  margin: 1rem 0;
-  padding: 0.8rem 1rem;
-  border-left: 3px solid var(--accent);
-  background: var(--fail-bg);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.7rem;
-  color: var(--fail);
-  letter-spacing: 0.03em;
-}
-
-.empty-col {
-  padding: 2rem 1.2rem;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-@media (max-width: 640px) {
-  .masthead { grid-template-columns: 1fr; }
-  .rep-bar { grid-template-columns: auto 1fr; }
-  .rep-stats { display: none; }
-  .content-grid { grid-template-columns: 1fr; }
-  .col { border-right: none; border-bottom: 1px solid var(--rule); }
-  .search-panel { gap: 0.75rem; }
+:root{--ink:#0e0e0c;--paper:#f5f2eb;--card:#fdfcf8;--rule:#d6d1c4;--accent:#c0392b;--accent2:#1a3a5c;--muted:#7a7568;--tag-bg:#e8e3d8;--pass:#1a5c2a;--pass-bg:#d4f0dc;--pend:#6b4c00;--pend-bg:#fdf0c2;--up:#1a3a5c;--up-bg:#d6e8f8}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;font-weight:300;min-height:100vh}
+.masthead{border-bottom:3px double var(--rule);padding:1.5rem 2rem 1.2rem;display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:1rem}
+.masthead-title{font-family:'Libre Baskerville',serif;font-size:1.8rem;letter-spacing:-.02em;line-height:1}
+.masthead-title span{color:var(--accent)}
+.masthead-sub{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:4px}
+.masthead-date{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.wrap{max-width:960px;margin:0 auto;padding:0 1.5rem 4rem}
+.search-panel{border-bottom:1px solid var(--rule);padding:1.25rem 0;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.city-tabs{display:flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.city-tab{padding:6px 18px;font-family:'DM Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;border:none;background:var(--card);color:var(--muted);transition:background .15s,color .15s}
+.city-tab.active{background:var(--ink);color:white}
+.search-select{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--rule);border-radius:3px;background:var(--card);font-family:'Barlow',sans-serif;font-size:.875rem;color:var(--ink);cursor:pointer}
+.search-select:focus{outline:2px solid var(--accent2);outline-offset:1px}
+.btn-go{padding:8px 22px;background:var(--ink);color:white;border:none;border-radius:3px;font-family:'DM Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;white-space:nowrap}
+.btn-go:hover{background:var(--accent2)}
+.btn-go:disabled{opacity:.35;cursor:not-allowed}
+.status-bar{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap;letter-spacing:.04em}
+.status-item{display:flex;align-items:center;gap:4px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:#2ecc71}.dot-err{background:var(--accent)}.dot-wait{background:#ccc;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+.rep-bar{display:flex;align-items:center;gap:1.25rem;padding:1.5rem 0 1.25rem;border-bottom:2px solid var(--ink);flex-wrap:wrap}
+.rep-initial{width:52px;height:52px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:'Libre Baskerville',serif;font-size:1.2rem;font-weight:700;flex-shrink:0}
+.rep-info{flex:1;min-width:200px}
+.rep-name{font-family:'Libre Baskerville',serif;font-size:1.4rem;font-weight:700;line-height:1.1}
+.rep-sub{font-family:'DM Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:4px}
+.rep-contact{font-size:.8rem;color:var(--muted);margin-top:3px}
+.rep-contact a{color:var(--accent2);text-decoration:none}
+.rep-contact a:hover{text-decoration:underline}
+.rep-stats{display:flex;gap:1.5rem;text-align:center}
+.stat-n{font-family:'Libre Baskerville',serif;font-size:1.8rem;font-weight:700;line-height:1;color:var(--accent2)}
+.stat-l{font-family:'DM Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--rule)}
+.col{border-right:1px solid var(--rule)}.col:last-child{border-right:none}
+.col-head{font-family:'DM Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.8rem 1rem .5rem;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center}
+.col-count{background:var(--tag-bg);padding:1px 7px;border-radius:10px;font-size:.58rem}
+.fullrow{border-top:1px solid var(--rule)}
+.tag-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:.8rem 1rem}
+.tag{padding:4px 10px;border:1px solid var(--rule);border-radius:2px;font-size:.75rem;background:var(--card)}
+.tag-role{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-transform:uppercase;margin-left:5px}
+.row{padding:.7rem 1rem;border-bottom:1px solid var(--rule);transition:background .1s;cursor:default}
+.row:hover{background:#f0ece3}
+.row:last-child{border-bottom:none}
+.row-id{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.04em;margin-bottom:2px}
+.row-title{font-size:.82rem;line-height:1.4}
+.row-date{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:4px}
+.pill{display:inline-block;padding:1px 6px;border-radius:2px;font-family:'DM Mono',monospace;font-size:.58rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-left:5px;vertical-align:middle}
+.pill-pass{background:var(--pass-bg);color:var(--pass)}
+.pill-pend{background:var(--pend-bg);color:var(--pend)}
+.pill-up{background:var(--up-bg);color:var(--up)}
+.evt-row{padding:.7rem 1rem;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:44px 1fr;gap:.6rem;align-items:start;transition:background .1s}
+.evt-row:hover{background:#f0ece3}
+.evt-row:last-child{border-bottom:none}
+.evt-day{font-family:'Libre Baskerville',serif;font-size:1.2rem;font-weight:700;line-height:1;text-align:center}
+.evt-mon{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center}
+.evt-name{font-size:.82rem;font-weight:400;line-height:1.35}
+.evt-sub{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:2px}
+.empty{padding:2rem 1rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.loading-box{padding:3rem;text-align:center}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--rule);border-top-color:var(--ink);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.load-text{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:10px}
+.err-box{margin:1rem 0;padding:.8rem 1rem;border-left:3px solid var(--accent);background:#fdf0ef;font-family:'DM Mono',monospace;font-size:.7rem;color:#6b1a1a}
+.foot-note{padding:.75rem 0;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);letter-spacing:.06em}
+.foot-note a{color:var(--muted)}
+@media(max-width:640px){
+  .masthead{padding:1rem}.wrap{padding:0 1rem 3rem}
+  .grid2{grid-template-columns:1fr}.col{border-right:none;border-bottom:1px solid var(--rule)}
+  .rep-stats{display:none}.search-panel{gap:.5rem}
 }
 </style>
 </head>
 <body>
-
+ 
 <div class="masthead">
   <div>
     <div class="masthead-title">Rep<span>Tracker</span></div>
-    <div class="masthead-sub">NYC &amp; Chicago City Council Activity</div>
+    <div class="masthead-sub">NYC &amp; Chicago · What did my rep do this week?</div>
   </div>
-  <div class="masthead-date" id="today-date"></div>
+  <div class="masthead-date" id="today"></div>
 </div>
-
+ 
 <div class="wrap">
-
-  <!-- SEARCH -->
   <div class="search-panel">
     <div class="city-tabs">
-      <button class="city-tab active" id="tab-nyc" onclick="switchCity('nyc')">New York City</button>
-      <button class="city-tab" id="tab-chi" onclick="switchCity('chicago')">Chicago</button>
+      <button class="city-tab active" onclick="switchCity('nyc')" id="tab-nyc">NYC</button>
+      <button class="city-tab" onclick="switchCity('chi')" id="tab-chi">Chicago</button>
     </div>
-    <select class="search-select" id="rep-select" onchange="onSelectChange()">
+    <select class="search-select" id="sel" onchange="document.getElementById('go').disabled=!this.value">
       <option value="">Loading…</option>
     </select>
-    <button class="btn-go" id="go-btn" onclick="go()" disabled>View →</button>
+    <button class="btn-go" id="go" disabled onclick="go()">View →</button>
   </div>
-
-  <!-- DIAGNOSTICS -->
-  <div class="diag-bar" id="diag-bar">
-    <div class="diag-item"><div class="dot dot-wait" id="d-nyc-members"></div><span>NYC members</span></div>
-    <div class="diag-item"><div class="dot dot-wait" id="d-nyc-committees"></div><span>NYC committees</span></div>
-    <div class="diag-item"><div class="dot dot-wait" id="d-nyc-meetings"></div><span>NYC meetings</span></div>
-    <div class="diag-item"><div class="dot dot-wait" id="d-chi-persons"></div><span>Chicago persons</span></div>
-    <div class="diag-item"><div class="dot dot-wait" id="d-chi-bills"></div><span>Chicago bills</span></div>
-    <div class="diag-item"><div class="dot dot-wait" id="d-chi-events"></div><span>Chicago events</span></div>
-  </div>
-
-  <!-- RESULTS -->
+ 
+  <div class="status-bar" id="statusbar"></div>
   <div id="result"></div>
-
 </div>
-
+ 
 <script>
-// ─────────────────────────────────────────────────
-// ENDPOINTS — tested for browser CORS support
-// ─────────────────────────────────────────────────
-const EP = {
-  nyc_members:    'https://data.cityofnewyork.us/resource/uvw5-9znb.json?$limit=70',
-  nyc_committees: 'https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000',
-  nyc_meetings:   'https://data.cityofnewyork.us/resource/m48u-yjt8.json?$limit=200&$order=meeting_date DESC',
-  chi_base:       'https://puddle.datamade.us/chicago_council',
-};
-
-// ─────────────────────────────────────────────────
+// ════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════
+const NYC_MEMBERS    = 'https://data.cityofnewyork.us/resource/uvw5-9znb.json?$limit=70';
+const NYC_COMMITTEES = 'https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000';
+const NYC_MEETINGS   = 'https://data.cityofnewyork.us/resource/m48u-yjt8.json?$limit=200&$order=meeting_date%20DESC';
+const CHI            = 'https://puddle.datamade.us/chicago_council';
+ 
+// ════════════════════════════════════════════════════
 // STATE
-// ─────────────────────────────────────────────────
-let currentCity = 'nyc';
-let cache = {
-  nyc_members: null,
-  nyc_committees: null,
-  nyc_meetings: null,
-  chi_persons: null,
-};
-
-// ─────────────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────────────
-document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
+// ════════════════════════════════════════════════════
+let city = 'nyc';
+let D = { nyc_members:[], nyc_committees:[], nyc_meetings:[], chi_persons:[] };
+let endpoints = {};
+ 
+document.getElementById('today').textContent =
+  new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+ 
+// ════════════════════════════════════════════════════
+// SMART FIELD FINDER
+//   Instead of guessing field names, we search for
+//   the right field by looking at key names + values.
+// ════════════════════════════════════════════════════
+function findField(obj, ...hints) {
+  // Returns the first key whose name contains any of the hints (case-insensitive)
+  if (!obj) return null;
+  const keys = Object.keys(obj);
+  for (const hint of hints) {
+    const h = hint.toLowerCase();
+    const match = keys.find(k => k.toLowerCase().includes(h));
+    if (match) return match;
+  }
+  return null;
+}
+ 
+function getField(obj, ...hints) {
+  const key = findField(obj, ...hints);
+  return key ? obj[key] : null;
+}
+ 
+// Get the "name" of a person record, trying many possible field names
+function personName(rec) {
+  return getField(rec, 'council_member', 'person_name', 'name', 'full_name', 'member_name', 'first_name')
+    || 'Unknown';
+}
+function personDistrict(rec) {
+  return getField(rec, 'district', 'ward', 'seat') || '';
+}
+function personEmail(rec) {
+  return getField(rec, 'email', 'e_mail') || '';
+}
+function personPhone(rec) {
+  return getField(rec, 'phone', 'telephone') || '';
+}
+function personBorough(rec) {
+  return getField(rec, 'borough', 'boro') || '';
+}
+ 
+function committeeName(rec) {
+  return getField(rec, 'committee_name', 'committee', 'body_name', 'name') || 'Committee';
+}
+function committeeMemberName(rec) {
+  return getField(rec, 'council_member_name', 'member_name', 'person_name', 'name') || '';
+}
+function committeeRole(rec) {
+  return getField(rec, 'role', 'title', 'position') || 'Member';
+}
+ 
+function meetingName(rec) {
+  return getField(rec, 'committee_name', 'meeting_name', 'name', 'body_name', 'event_name') || 'Council Meeting';
+}
+function meetingDate(rec) {
+  return getField(rec, 'meeting_date', 'date', 'start_date', 'event_date') || '';
+}
+function meetingLocation(rec) {
+  return getField(rec, 'location', 'meeting_location', 'address') || '';
+}
+function meetingStatus(rec) {
+  return getField(rec, 'meeting_status', 'status', 'agenda_status') || '';
+}
+ 
+// ════════════════════════════════════════════════════
+// BOOT — LOAD ALL DATA
+// ════════════════════════════════════════════════════
 async function boot() {
-  await Promise.all([loadNYCData(), loadChiData()]);
+  const tests = [
+    { id:'nyc-members',    label:'NYC members',    fn: () => jfetch(NYC_MEMBERS) },
+    { id:'nyc-committees', label:'NYC committees', fn: () => jfetch(NYC_COMMITTEES) },
+    { id:'nyc-meetings',   label:'NYC meetings',   fn: () => jfetch(NYC_MEETINGS) },
+    { id:'chi-persons',    label:'CHI persons',    fn: () => jfetch(CHI+'/person.json?_shape=array&_size=100&_sort=name') },
+    { id:'chi-events',     label:'CHI events',     fn: () => jfetch(CHI+'/event.json?_shape=array&_size=2&_sort_desc=start_date') },
+  ];
+ 
+  // Show status dots
+  const bar = document.getElementById('statusbar');
+  bar.innerHTML = tests.map(t =>
+    `<span class="status-item"><span class="dot dot-wait" id="dot-${t.id}"></span>${t.label}</span>`
+  ).join('');
+ 
+  // Fire all in parallel
+  const results = await Promise.allSettled(tests.map(t => t.fn()));
+ 
+  results.forEach((r, i) => {
+    const dot = document.getElementById('dot-' + tests[i].id);
+    if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+      dot.className = 'dot dot-ok';
+    } else {
+      dot.className = 'dot dot-err';
+    }
+  });
+ 
+  // Store data
+  D.nyc_members    = results[0].status === 'fulfilled' ? results[0].value : [];
+  D.nyc_committees = results[1].status === 'fulfilled' ? results[1].value : [];
+  D.nyc_meetings   = results[2].status === 'fulfilled' ? results[2].value : [];
+  D.chi_persons    = results[3].status === 'fulfilled' ? results[3].value : [];
+ 
+  // Log first record of each for debugging (open browser console to see)
+  if (D.nyc_members[0])    console.log('NYC member fields:', Object.keys(D.nyc_members[0]), D.nyc_members[0]);
+  if (D.nyc_committees[0]) console.log('NYC committee fields:', Object.keys(D.nyc_committees[0]), D.nyc_committees[0]);
+  if (D.nyc_meetings[0])   console.log('NYC meeting fields:', Object.keys(D.nyc_meetings[0]), D.nyc_meetings[0]);
+  if (D.chi_persons[0])    console.log('CHI person fields:', Object.keys(D.chi_persons[0]), D.chi_persons[0]);
+ 
+  // Populate select
+  if (city === 'nyc') fillNYC(); else fillChi();
 }
-
-// ─────────────────────────────────────────────────
-// NYC DATA LOAD
-// ─────────────────────────────────────────────────
-async function loadNYCData() {
-  // Members
-  try {
-    const data = await apiFetch(EP.nyc_members);
-    cache.nyc_members = data;
-    dot('d-nyc-members', 'ok');
-  } catch(e) {
-    dot('d-nyc-members', 'err');
-    console.error('NYC members:', e.message);
-  }
-
-  // Committees
-  try {
-    const data = await apiFetch(EP.nyc_committees);
-    cache.nyc_committees = data;
-    dot('d-nyc-committees', 'ok');
-  } catch(e) {
-    dot('d-nyc-committees', 'err');
-    console.error('NYC committees:', e.message);
-  }
-
-  // Meetings
-  try {
-    const data = await apiFetch(EP.nyc_meetings);
-    cache.nyc_meetings = data;
-    dot('d-nyc-meetings', 'ok');
-  } catch(e) {
-    dot('d-nyc-meetings', 'err');
-    console.error('NYC meetings:', e.message);
-  }
-
-  // Populate NYC dropdown if it's the current city
-  if (currentCity === 'nyc') populateNYCSelect();
-}
-
-function populateNYCSelect() {
-  const sel = document.getElementById('rep-select');
-  if (!cache.nyc_members || cache.nyc_members.length === 0) {
-    sel.innerHTML = '<option value="">NYC data unavailable — see diagnostics</option>';
+ 
+// ════════════════════════════════════════════════════
+// DROPDOWNS
+// ════════════════════════════════════════════════════
+function fillNYC() {
+  const sel = document.getElementById('sel');
+  if (!D.nyc_members.length) {
+    sel.innerHTML = '<option value="">NYC data unavailable — try Chicago</option>';
     return;
   }
+  const sorted = [...D.nyc_members].sort((a,b) => personName(a).localeCompare(personName(b)));
   sel.innerHTML = '<option value="">— Select your council member —</option>';
-  [...cache.nyc_members]
-    .sort((a,b) => (a.council_member||'').localeCompare(b.council_member||''))
-    .forEach(m => {
-      const o = document.createElement('option');
-      o.value = JSON.stringify(m);
-      o.textContent = (m.council_member||'Unknown') + (m.district ? '  ·  District ' + m.district : '');
-      sel.appendChild(o);
-    });
+  sorted.forEach((m, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = personName(m) + (personDistrict(m) ? '  ·  Dist. ' + personDistrict(m) : '');
+    sel.appendChild(o);
+  });
+  // Store sorted for lookup
+  D._nyc_sorted = sorted;
 }
-
-// ─────────────────────────────────────────────────
-// CHICAGO DATA LOAD
-// ─────────────────────────────────────────────────
-async function loadChiData() {
-  // Try two SQL approaches to get council members
-  const queries = [
-    `SELECT DISTINCT p.id, p.name FROM person p
-     JOIN membership m ON m.person_id = p.id
-     JOIN organization o ON o.id = m.organization_id
-     WHERE (o.name LIKE '%Council%' OR o.name LIKE '%Alderm%') AND p.name IS NOT NULL
-     ORDER BY p.name LIMIT 60`,
-    `SELECT id, name FROM person WHERE name IS NOT NULL ORDER BY name LIMIT 80`
-  ];
-
-  let persons = null;
-  for (const sql of queries) {
-    try {
-      const url = `${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`;
-      const data = await apiFetch(url);
-      if (data && data.length > 0) { persons = data; break; }
-    } catch(e) { /* try next */ }
-  }
-
-  if (persons) {
-    cache.chi_persons = persons;
-    dot('d-chi-persons', 'ok');
-  } else {
-    dot('d-chi-persons', 'err');
-    console.error('Chicago persons: all queries failed');
-  }
-
-  // Test bills endpoint
-  try {
-    const sql = `SELECT COUNT(*) as n FROM bill LIMIT 1`;
-    await apiFetch(`${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`);
-    dot('d-chi-bills', 'ok');
-  } catch(e) {
-    dot('d-chi-bills', 'err');
-    console.error('Chicago bills:', e.message);
-  }
-
-  // Test events endpoint
-  try {
-    const sql = `SELECT COUNT(*) as n FROM event LIMIT 1`;
-    await apiFetch(`${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`);
-    dot('d-chi-events', 'ok');
-  } catch(e) {
-    dot('d-chi-events', 'err');
-    console.error('Chicago events:', e.message);
-  }
-}
-
-function populateChiSelect() {
-  const sel = document.getElementById('rep-select');
-  if (!cache.chi_persons || cache.chi_persons.length === 0) {
-    sel.innerHTML = '<option value="">Chicago data unavailable — see diagnostics</option>';
+ 
+function fillChi() {
+  const sel = document.getElementById('sel');
+  if (!D.chi_persons.length) {
+    sel.innerHTML = '<option value="">Chicago data unavailable — try NYC</option>';
     return;
   }
   sel.innerHTML = '<option value="">— Select your alder —</option>';
-  cache.chi_persons.forEach(p => {
+  D.chi_persons.forEach((p, i) => {
+    if (!p.name) return;
     const o = document.createElement('option');
-    o.value = p.id;
-    o.dataset.name = p.name;
+    o.value = i;
     o.textContent = p.name;
     sel.appendChild(o);
   });
 }
-
-// ─────────────────────────────────────────────────
-// UI CONTROLS
-// ─────────────────────────────────────────────────
+ 
 function switchCity(c) {
-  currentCity = c;
+  city = c;
   document.getElementById('tab-nyc').classList.toggle('active', c === 'nyc');
-  document.getElementById('tab-chi').classList.toggle('active', c === 'chicago');
+  document.getElementById('tab-chi').classList.toggle('active', c === 'chi');
   document.getElementById('result').innerHTML = '';
-  document.getElementById('go-btn').disabled = true;
-
-  if (c === 'nyc') populateNYCSelect();
-  else populateChiSelect();
+  document.getElementById('go').disabled = true;
+  if (c === 'nyc') fillNYC(); else fillChi();
 }
-
-function onSelectChange() {
-  const v = document.getElementById('rep-select').value;
-  document.getElementById('go-btn').disabled = !v;
-}
-
+ 
+// ════════════════════════════════════════════════════
+// GO — SHOW REP DATA
+// ════════════════════════════════════════════════════
 function go() {
-  if (currentCity === 'nyc') goNYC();
-  else goChicago();
+  if (city === 'nyc') showNYC(); else showChi();
 }
-
-// ─────────────────────────────────────────────────
-// NYC VIEW
-// ─────────────────────────────────────────────────
-async function goNYC() {
-  const sel = document.getElementById('rep-select');
-  const member = JSON.parse(sel.value);
-  const name = member.council_member || 'Unknown';
-  const district = member.district || '';
-
-  setResult(spinner('Loading data for ' + name + '…'));
-
-  // Committees for this member
-  const memberCommittees = (cache.nyc_committees || [])
-    .filter(c => (c.council_member_name||'').toLowerCase() === name.toLowerCase());
-
+ 
+// ═══════ NYC ═══════
+function showNYC() {
+  const idx = +document.getElementById('sel').value;
+  const member = D._nyc_sorted[idx];
+  if (!member) return;
+ 
+  const name     = personName(member);
+  const district = personDistrict(member);
+  const email    = personEmail(member);
+  const phone    = personPhone(member);
+  const borough  = personBorough(member);
+ 
+  // Match committees
+  const myComms = D.nyc_committees.filter(c =>
+    committeeMemberName(c).toLowerCase() === name.toLowerCase()
+  );
+  // Dedup by committee name
+  const commMap = new Map();
+  myComms.forEach(c => {
+    const cn = committeeName(c);
+    if (!commMap.has(cn)) commMap.set(cn, committeeRole(c));
+  });
+ 
   const now = new Date();
   const ago30 = new Date(now - 30 * 864e5);
-
-  const allMeetings = cache.nyc_meetings || [];
-  const upcoming = allMeetings
-    .filter(m => m.meeting_date && new Date(m.meeting_date) >= now)
-    .sort((a,b) => new Date(a.meeting_date) - new Date(b.meeting_date))
+ 
+  const upcoming = D.nyc_meetings
+    .filter(m => { const d = meetingDate(m); return d && new Date(d) >= now; })
+    .sort((a,b) => new Date(meetingDate(a)) - new Date(meetingDate(b)))
     .slice(0, 20);
-  const recent = allMeetings
-    .filter(m => m.meeting_date && new Date(m.meeting_date) < now && new Date(m.meeting_date) > ago30)
-    .sort((a,b) => new Date(b.meeting_date) - new Date(a.meeting_date))
+ 
+  const recent = D.nyc_meetings
+    .filter(m => { const d = meetingDate(m); return d && new Date(d) < now && new Date(d) > ago30; })
+    .sort((a,b) => new Date(meetingDate(b)) - new Date(meetingDate(a)))
     .slice(0, 20);
-
-  // Build HTML
+ 
   let html = '';
-
-  // Rep header
-  html += `<div class="rep-bar">
-    <div class="rep-initial">${initials(name)}</div>
-    <div>
-      <div class="rep-name">${name}</div>
-      <div class="rep-sub">NYC Council Member${district ? ' · District ' + district : ''}${member.borough ? ' · ' + member.borough : ''}</div>
-      ${member.email ? `<div class="rep-contact"><a href="mailto:${member.email}">${member.email}</a></div>` : ''}
-      ${member.phone ? `<div class="rep-contact">${member.phone}</div>` : ''}
-    </div>
-    <div class="rep-stats">
-      <div>
-        <div class="rep-stat-n">${memberCommittees.length}</div>
-        <div class="rep-stat-l">Committees</div>
-      </div>
-      <div>
-        <div class="rep-stat-n">${upcoming.length + recent.length}</div>
-        <div class="rep-stat-l">Meetings</div>
-      </div>
-    </div>
-  </div>`;
-
-  // Committee tags
-  if (memberCommittees.length > 0) {
-    html += `<div class="full-col">
-      <div class="col-head">Committee Memberships <span class="col-count">${memberCommittees.length}</span></div>
-      <div class="committee-grid">`;
-    const seen = new Set();
-    memberCommittees.forEach(c => {
-      const cname = c.committee_name || c.committee || 'Committee';
-      if (seen.has(cname)) return;
-      seen.add(cname);
-      html += `<div class="committee-tag">${cname} <span class="committee-role">${c.role||'Member'}</span></div>`;
+ 
+  // Header
+  html += repHeader(name,
+    `NYC Council Member${district ? ' · District '+district : ''}${borough ? ' · '+borough : ''}`,
+    email, phone,
+    [[commMap.size, 'Committees'], [upcoming.length, 'Upcoming'], [recent.length, 'Recent (30d)']]);
+ 
+  // Committees
+  if (commMap.size > 0) {
+    html += `<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${commMap.size}</span></div>`;
+    html += `<div class="tag-wrap">`;
+    commMap.forEach((role, name) => {
+      html += `<span class="tag">${name}<span class="tag-role">${role}</span></span>`;
     });
     html += `</div></div>`;
   }
-
-  // Two-column: upcoming | recent
-  html += `<div class="content-grid">`;
-
-  // Upcoming meetings
-  html += `<div class="col">
-    <div class="col-head">Upcoming Meetings <span class="col-count">${upcoming.length}</span></div>`;
-  if (upcoming.length === 0) {
-    html += `<div class="empty-col">No upcoming meetings found</div>`;
-  } else {
-    upcoming.forEach(m => {
-      const d = new Date(m.meeting_date);
-      html += `<div class="evt-row">
-        <div class="evt-date-block">
-          <div class="evt-day">${d.getDate()}</div>
-          <div class="evt-mon">${d.toLocaleString('en-US',{month:'short'})}</div>
-        </div>
-        <div>
-          <div class="evt-name">${m.committee_name || m.meeting_name || 'City Council'} <span class="pill pill-up">Upcoming</span></div>
-          <div class="evt-sub">${m.location||''}</div>
-        </div>
-      </div>`;
-    });
-  }
+ 
+  // 2-col: upcoming | recent
+  html += `<div class="grid2">`;
+  html += evtCol('Upcoming meetings', upcoming, true);
+  html += evtCol('Recent meetings (30 days)', recent, false);
   html += `</div>`;
-
-  // Recent meetings
-  html += `<div class="col">
-    <div class="col-head">Recent Meetings (30 days) <span class="col-count">${recent.length}</span></div>`;
-  if (recent.length === 0) {
-    html += `<div class="empty-col">No recent meetings in dataset</div>`;
-  } else {
-    recent.forEach(m => {
-      const d = new Date(m.meeting_date);
-      html += `<div class="evt-row">
-        <div class="evt-date-block">
-          <div class="evt-day">${d.getDate()}</div>
-          <div class="evt-mon">${d.toLocaleString('en-US',{month:'short'})}</div>
-        </div>
-        <div>
-          <div class="evt-name">${m.committee_name || m.meeting_name || 'City Council'}</div>
-          <div class="evt-sub">${m.meeting_status||''}</div>
-        </div>
-      </div>`;
-    });
-  }
-  html += `</div></div>`;
-
-  // Source note
-  html += `<div style="padding:.75rem 0; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); letter-spacing:.06em;">
-    DATA: <a href="https://data.cityofnewyork.us" target="_blank" style="color:var(--muted)">NYC OPEN DATA (SOCRATA)</a> — UPDATED REGULARLY
-  </div>`;
-
-  setResult(html);
+ 
+  html += `<div class="foot-note">DATA: <a href="https://data.cityofnewyork.us" target="_blank">NYC OPEN DATA</a> · <a href="https://legistar.council.nyc.gov" target="_blank">LEGISTAR</a></div>`;
+ 
+  document.getElementById('result').innerHTML = html;
 }
-
-// ─────────────────────────────────────────────────
-// CHICAGO VIEW
-// ─────────────────────────────────────────────────
-async function goChicago() {
-  const sel = document.getElementById('rep-select');
-  const personId = sel.value;
-  const name = sel.options[sel.selectedIndex].dataset.name || 'this alder';
-
-  setResult(spinner('Loading data for ' + name + '…'));
-
-  const now = new Date();
-  const ago30 = new Date(now - 30 * 864e5);
-
-  // Bills sponsored
-  let bills = [];
+ 
+// ═══════ CHICAGO ═══════
+async function showChi() {
+  const idx = +document.getElementById('sel').value;
+  const person = D.chi_persons[idx];
+  if (!person) return;
+ 
+  const personId = person.id;
+  const name = person.name || 'Unknown';
+ 
+  document.getElementById('result').innerHTML =
+    `<div class="loading-box"><div class="spin"></div><div class="load-text">Loading ${name}…</div></div>`;
+ 
+  // Fetch bills + events + memberships for this person
+  let bills = [], events = [], comms = [];
   try {
-    const sql = `SELECT b.id, b.identifier, b.title, b.classification, b.updated_at, b.created_at
+    const q = `SELECT b.identifier, b.title, b.classification, b.updated_at
       FROM bill b JOIN billsponsorship bs ON bs.bill_id = b.id
       WHERE bs.person_id = '${personId}'
       ORDER BY b.updated_at DESC LIMIT 30`;
-    bills = await apiFetch(`${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`);
-  } catch(e) { console.error('bills:', e); }
-
-  // Events (council + committee meetings)
-  let events = [];
+    bills = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
+  } catch(e) { console.warn('CHI bills error:', e); }
+ 
   try {
-    const sql = `SELECT e.id, e.name, e.start_date, e.status, o.name as org_name, e.location
+    const q = `SELECT e.name, e.start_date, e.status, e.location, o.name as org_name
       FROM event e JOIN organization o ON o.id = e.organization_id
       ORDER BY e.start_date DESC LIMIT 60`;
-    events = await apiFetch(`${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`);
-  } catch(e) { console.error('events:', e); }
-
-  // Committees for this person
-  let committees = [];
+    events = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
+  } catch(e) { console.warn('CHI events error:', e); }
+ 
   try {
-    const sql = `SELECT DISTINCT o.name, m.role
+    const q = `SELECT DISTINCT o.name, m.role
       FROM membership m JOIN organization o ON o.id = m.organization_id
-      WHERE m.person_id = '${personId}' AND o.name NOT LIKE '%Council%'
-      LIMIT 20`;
-    committees = await apiFetch(`${EP.chi_base}.json?sql=${encodeURIComponent(sql)}&_shape=array`);
-  } catch(e) { console.error('committees:', e); }
-
+      WHERE m.person_id = '${personId}' AND o.name NOT LIKE '%City Council%'
+      LIMIT 25`;
+    comms = await jfetch(`${CHI}.json?sql=${encodeURIComponent(q)}&_shape=array`);
+  } catch(e) { console.warn('CHI comms error:', e); }
+ 
+  const now = new Date();
+  const ago30 = new Date(now - 30 * 864e5);
+ 
+  const recentBills = bills.filter(b => b.updated_at && new Date(b.updated_at) > ago30);
+  const showBills = recentBills.length > 0 ? recentBills : bills.slice(0,12);
+  const billLabel = recentBills.length > 0 ? 'Legislation (last 30 days)' : 'Legislation on record';
+ 
   const upcoming = events.filter(e => e.start_date && new Date(e.start_date) >= now)
     .sort((a,b) => new Date(a.start_date) - new Date(b.start_date)).slice(0,20);
   const recent = events.filter(e => e.start_date && new Date(e.start_date) < now && new Date(e.start_date) > ago30)
     .sort((a,b) => new Date(b.start_date) - new Date(a.start_date)).slice(0,20);
-  const recentBills = bills.filter(b => b.updated_at && new Date(b.updated_at) > ago30);
-
+ 
   let html = '';
-
-  // Rep header
-  html += `<div class="rep-bar">
-    <div class="rep-initial">${initials(name)}</div>
-    <div>
-      <div class="rep-name">${name}</div>
-      <div class="rep-sub">Chicago Alder · City Council</div>
-    </div>
-    <div class="rep-stats">
-      <div>
-        <div class="rep-stat-n">${bills.length}</div>
-        <div class="rep-stat-l">Bills total</div>
-      </div>
-      <div>
-        <div class="rep-stat-n">${recentBills.length}</div>
-        <div class="rep-stat-l">Bills (30d)</div>
-      </div>
-      <div>
-        <div class="rep-stat-n">${upcoming.length}</div>
-        <div class="rep-stat-l">Upcoming</div>
-      </div>
-    </div>
-  </div>`;
-
+ 
+  html += repHeader(name, 'Chicago Alder · City Council', '', '',
+    [[bills.length, 'Bills total'], [recentBills.length, 'Bills (30d)'], [upcoming.length, 'Upcoming']]);
+ 
   // Committees
-  if (committees.length > 0) {
-    html += `<div class="full-col">
-      <div class="col-head">Committee Memberships <span class="col-count">${committees.length}</span></div>
-      <div class="committee-grid">`;
-    committees.forEach(c => {
-      html += `<div class="committee-tag">${c.name||'Committee'} <span class="committee-role">${c.role||'Member'}</span></div>`;
+  if (comms.length > 0) {
+    html += `<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${comms.length}</span></div>`;
+    html += `<div class="tag-wrap">`;
+    comms.forEach(c => {
+      html += `<span class="tag">${c.name||'Committee'}<span class="tag-role">${c.role||'Member'}</span></span>`;
     });
     html += `</div></div>`;
   }
-
-  // Two columns: bills | events
-  html += `<div class="content-grid">`;
-
-  // Bills column
-  const showBills = recentBills.length > 0 ? recentBills : bills.slice(0,15);
-  const billLabel = recentBills.length > 0 ? 'Legislation (last 30 days)' : 'Legislation on record';
-  html += `<div class="col">
-    <div class="col-head">${billLabel} <span class="col-count">${showBills.length}</span></div>`;
+ 
+  // 2-col: bills | events
+  html += `<div class="grid2">`;
+ 
+  // Bills
+  html += `<div class="col"><div class="col-head">${billLabel} <span class="col-count">${showBills.length}</span></div>`;
   if (showBills.length === 0) {
-    html += `<div class="empty-col">No legislation found for this member</div>`;
+    html += `<div class="empty">No legislation found</div>`;
   } else {
     showBills.forEach(b => {
-      const cls = statusPill(b.classification);
-      html += `<div class="bill-row">
-        <div class="bill-id">${b.identifier||'—'} <span class="pill ${cls.c}">${cls.t}</span></div>
-        <div class="bill-title">${b.title||'(no title)'}</div>
-        <div class="bill-date">Updated ${fmtDate(b.updated_at)}</div>
+      const pillCls = statusPill(b.classification);
+      html += `<div class="row">
+        <div class="row-id">${b.identifier||'—'}<span class="pill ${pillCls.c}">${pillCls.t}</span></div>
+        <div class="row-title">${(b.title||'').slice(0,200)}${(b.title||'').length>200?'…':''}</div>
+        <div class="row-date">${fmtDate(b.updated_at)}</div>
       </div>`;
     });
   }
   html += `</div>`;
-
-  // Events column — upcoming first, then recent
+ 
+  // Events
   const allEvts = [...upcoming, ...recent];
-  html += `<div class="col">
-    <div class="col-head">Meetings & Events <span class="col-count">${allEvts.length}</span></div>`;
+  html += `<div class="col"><div class="col-head">Meetings & events <span class="col-count">${allEvts.length}</span></div>`;
   if (allEvts.length === 0) {
-    html += `<div class="empty-col">No events found</div>`;
+    html += `<div class="empty">No events found</div>`;
   } else {
     allEvts.forEach(e => {
       const d = new Date(e.start_date);
-      const isUp = new Date(e.start_date) >= now;
+      const isUp = d >= now;
       html += `<div class="evt-row">
-        <div class="evt-date-block">
+        <div>
           <div class="evt-day">${d.getDate()}</div>
           <div class="evt-mon">${d.toLocaleString('en-US',{month:'short'})}</div>
         </div>
         <div>
-          <div class="evt-name">${e.org_name||e.name||'Meeting'} ${isUp ? '<span class="pill pill-up">Upcoming</span>' : ''}</div>
-          <div class="evt-sub">${e.location||''} ${e.status ? '· '+e.status : ''}</div>
+          <div class="evt-name">${e.org_name||e.name||'Meeting'}${isUp?'<span class="pill pill-up">upcoming</span>':''}</div>
+          <div class="evt-sub">${e.location||''} ${e.status?'· '+e.status:''}</div>
         </div>
       </div>`;
     });
   }
   html += `</div></div>`;
-
-  html += `<div style="padding:.75rem 0; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); letter-spacing:.06em;">
-    DATA: <a href="https://chicago.councilmatic.org" target="_blank" style="color:var(--muted)">CHICAGO COUNCILMATIC</a> / 
-    <a href="https://puddle.datamade.us/chicago_council" target="_blank" style="color:var(--muted)">DATAMADE DATASETTE</a> — UPDATED NIGHTLY
-  </div>`;
-
-  setResult(html);
-}
-
-// ─────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────
-async function apiFetch(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${url.slice(0,80)}`);
-  return res.json();
-}
-
-function dot(id, state) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.className = 'dot dot-' + (state === 'ok' ? 'ok' : 'err');
-}
-
-function initials(name) {
-  return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-}
-
-function fmtDate(str) {
-  if (!str) return '—';
-  try { return new Date(str).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
-  catch { return str; }
-}
-
-function statusPill(cls) {
-  const s = (cls||'').toLowerCase();
-  if (s.includes('pass') || s.includes('enact') || s.includes('approv')) return { c:'pill-pass', t: cls };
-  if (s.includes('fail') || s.includes('defeat') || s.includes('veto'))   return { c:'pill-fail', t: cls };
-  return { c:'pill-pend', t: cls || 'Filed' };
-}
-
-function spinner(msg) {
-  return `<div class="state-box"><div class="spin"></div><br>${msg}</div>`;
-}
-
-function setResult(html) {
+ 
+  html += `<div class="foot-note">DATA: <a href="https://chicago.councilmatic.org" target="_blank">CHICAGO COUNCILMATIC</a> · <a href="https://puddle.datamade.us/chicago_council" target="_blank">DATAMADE</a></div>`;
+ 
   document.getElementById('result').innerHTML = html;
 }
-
+ 
+// ════════════════════════════════════════════════════
+// SHARED RENDERING
+// ════════════════════════════════════════════════════
+function repHeader(name, subtitle, email, phone, stats) {
+  return `<div class="rep-bar">
+    <div class="rep-initial">${initials(name)}</div>
+    <div class="rep-info">
+      <div class="rep-name">${name}</div>
+      <div class="rep-sub">${subtitle}</div>
+      ${email ? `<div class="rep-contact"><a href="mailto:${email}">${email}</a></div>` : ''}
+      ${phone ? `<div class="rep-contact">${phone}</div>` : ''}
+    </div>
+    <div class="rep-stats">${stats.map(([n,l]) =>
+      `<div><div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`
+    ).join('')}</div>
+  </div>`;
+}
+ 
+function evtCol(title, events, isUpcoming) {
+  let html = `<div class="col"><div class="col-head">${title} <span class="col-count">${events.length}</span></div>`;
+  if (events.length === 0) {
+    html += `<div class="empty">None found in dataset</div>`;
+  } else {
+    events.forEach(m => {
+      const dStr = meetingDate(m);
+      const d = new Date(dStr);
+      html += `<div class="evt-row">
+        <div>
+          <div class="evt-day">${d.getDate()}</div>
+          <div class="evt-mon">${d.toLocaleString('en-US',{month:'short'})}</div>
+        </div>
+        <div>
+          <div class="evt-name">${meetingName(m)}${isUpcoming?'<span class="pill pill-up">upcoming</span>':''}</div>
+          <div class="evt-sub">${meetingLocation(m)} ${meetingStatus(m)?'· '+meetingStatus(m):''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  return html;
+}
+ 
+// ════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════
+async function jfetch(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
+}
+ 
+function initials(n) {
+  return (n||'?').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+}
+ 
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+  catch { return s; }
+}
+ 
+function statusPill(cls) {
+  const s = (cls||'').toLowerCase();
+  if (s.includes('pass')||s.includes('enact')||s.includes('approv')) return {c:'pill-pass',t:cls};
+  return {c:'pill-pend',t:cls||'Filed'};
+}
+ 
 boot();
 </script>
 </body>
