@@ -6,7 +6,7 @@
 <title>RepTracker — NYC & Chicago</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root{--ink:#0e0e0c;--paper:#f5f2eb;--card:#fdfcf8;--rule:#d6d1c4;--accent:#c0392b;--accent2:#1a3a5c;--muted:#7a7568;--tag-bg:#e8e3d8;--pass:#1a5c2a;--pass-bg:#d4f0dc;--pend:#6b4c00;--pend-bg:#fdf0c2;--up:#1a3a5c;--up-bg:#d6e8f8;--no:#8c1c1c;--no-bg:#f5d5d5;--yes:#1a5c2a;--yes-bg:#d4f0dc;--abs:#6b4c00;--abs-bg:#fdf0c2}
+:root{--ink:#0e0e0c;--paper:#f5f2eb;--card:#fdfcf8;--rule:#d6d1c4;--accent:#c0392b;--accent2:#1a3a5c;--muted:#7a7568;--tag-bg:#e8e3d8;--pass:#1a5c2a;--pass-bg:#d4f0dc;--pend:#6b4c00;--pend-bg:#fdf0c2;--up:#1a3a5c;--up-bg:#d6e8f8;--no:#8c1c1c;--no-bg:#f5d5d5;--yes:#1a5c2a;--yes-bg:#d4f0dc;--abs:#6b4c00;--abs-bg:#fdf0c2;--intro:#3a3a8c;--intro-bg:#e0e0f8;--act:#5c3a1a;--act-bg:#f5e8d6}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:15px}
 body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;font-weight:300;min-height:100vh}
@@ -55,21 +55,24 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
 .pill{display:inline-block;padding:1px 6px;border-radius:2px;font-family:'DM Mono',monospace;font-size:.58rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-left:5px;vertical-align:middle}
 .pill-pass{background:var(--pass-bg);color:var(--pass)}
 .pill-pend{background:var(--pend-bg);color:var(--pend)}
-.pill-up{background:var(--up-bg);color:var(--up)}
 .pill-yes{background:var(--yes-bg);color:var(--yes)}
 .pill-no{background:var(--no-bg);color:var(--no)}
+.pill-intro{background:var(--intro-bg);color:var(--intro)}
+.pill-action{background:var(--act-bg);color:var(--act)}
 .pill-abs{background:var(--abs-bg);color:var(--abs)}
-/* Vote row */
-.vote-row{padding:.65rem 1rem;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:52px 1fr;gap:.5rem;align-items:start;transition:background .1s}
-.vote-row:hover{background:#f0ece3}
-.vote-row:last-child{border-bottom:none}
-.vote-badge{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:2px;text-align:center;line-height:1.2}
-.vote-badge.yes{background:var(--yes-bg);color:var(--yes)}
-.vote-badge.no{background:var(--no-bg);color:var(--no)}
-.vote-badge.abs{background:var(--abs-bg);color:var(--abs)}
-.vote-badge.other{background:var(--tag-bg);color:var(--muted)}
-.vote-title{font-size:.8rem;line-height:1.4}
-.vote-meta{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-top:2px}
+/* Activity feed row */
+.act-row{padding:.6rem 1rem;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:52px 1fr;gap:.5rem;align-items:start;transition:background .1s}
+.act-row:hover{background:#f0ece3}
+.act-row:last-child{border-bottom:none}
+.act-type{font-family:'DM Mono',monospace;font-size:.6rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em;padding:3px 6px;border-radius:2px;text-align:center;line-height:1.2;white-space:nowrap}
+.act-type.sponsor{background:var(--intro-bg);color:var(--intro)}
+.act-type.action{background:var(--act-bg);color:var(--act)}
+.act-type.vote-y{background:var(--yes-bg);color:var(--yes)}
+.act-type.vote-n{background:var(--no-bg);color:var(--no)}
+.act-type.vote-o{background:var(--abs-bg);color:var(--abs)}
+.act-type.status{background:var(--pend-bg);color:var(--pend)}
+.act-title{font-size:.8rem;line-height:1.4}
+.act-meta{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-top:2px}
 .empty{padding:2rem 1rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .loading-box{padding:3rem;text-align:center}
 .spin{display:inline-block;width:18px;height:18px;border:2px solid var(--rule);border-top-color:var(--ink);border-radius:50%;animation:sp .7s linear infinite}
@@ -116,82 +119,58 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
   <div id="result"></div>
 </div>
 <script>
-// ══ CONFIG ══
-const NYC_MEMBERS = 'https://data.cityofnewyork.us/resource/uvw5-9znb.json?$limit=200';
-const NYC_COMMITTEES = 'https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000';
-const NYC_BILLS = 'https://data.cityofnewyork.us/resource/6ctv-n46c.json?$limit=500&$order=intro_date%20DESC';
-const NYC_LEGISTAR = 'https://webapi.legistar.com/v1/nyc';
-const CHI = 'https://puddle.datamade.us/chicago_council';
+const NYC_MEMBERS='https://data.cityofnewyork.us/resource/uvw5-9znb.json?$limit=200';
+const NYC_COMMITTEES='https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000';
+const NYC_BILLS='https://data.cityofnewyork.us/resource/6ctv-n46c.json?$limit=500&$order=intro_date%20DESC';
+const CHI='https://puddle.datamade.us/chicago_council';
+let city='nyc';
+let D={nyc_members:[],nyc_committees:[],nyc_bills:[],chi_persons:[]};
+window._billData=[];
+document.getElementById('today').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 
-// ══ STATE ══
-let city = 'nyc';
-let D = { nyc_members:[], nyc_committees:[], nyc_bills:[], chi_persons:[] };
-window._billData = [];
-
-document.getElementById('today').textContent =
-  new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-
-// ══ FIELD HELPERS ══
-function findField(obj,...hints){if(!obj)return null;const keys=Object.keys(obj);for(const h of hints){const m=keys.find(k=>k.toLowerCase()===h.toLowerCase());if(m)return m;}for(const h of hints){const hl=h.toLowerCase();const m=keys.find(k=>k.toLowerCase().includes(hl));if(m)return m;}return null;}
-function getField(obj,...hints){const k=findField(obj,...hints);return k?obj[k]:null;}
+function findField(o,...h){if(!o)return null;const k=Object.keys(o);for(const x of h){const m=k.find(i=>i.toLowerCase()===x.toLowerCase());if(m)return m;}for(const x of h){const xl=x.toLowerCase();const m=k.find(i=>i.toLowerCase().includes(xl));if(m)return m;}return null;}
+function getField(o,...h){const k=findField(o,...h);return k?o[k]:null;}
 function personName(r){return r.name||getField(r,'full_name','person_name','member_name')||'Unknown';}
 function personDistrict(r){return r.district||getField(r,'ward','seat')||'';}
 function committeeName(r){return getField(r,'committee_name','committee','body_name')||'Committee';}
 function committeeRole(r){return getField(r,'role','title','position')||'Member';}
 
-// ══ BOOT ══
 async function boot(){
   const tests=[
     {id:'nyc-members',label:'NYC members',fn:()=>jfetch(NYC_MEMBERS)},
     {id:'nyc-committees',label:'NYC committees',fn:()=>jfetch(NYC_COMMITTEES)},
     {id:'nyc-bills',label:'NYC bills',fn:()=>jfetch(NYC_BILLS)},
     {id:'chi-persons',label:'CHI persons',fn:()=>loadChiPersons()},
-    {id:'chi-votes',label:'CHI votes',fn:()=>chiSQL(`SELECT COUNT(*) as n FROM personvote LIMIT 1`)},
+    {id:'chi-data',label:'CHI activity',fn:()=>chiSQL(`SELECT COUNT(*) as n FROM billaction LIMIT 1`)},
   ];
   const bar=document.getElementById('statusbar');
   bar.innerHTML=tests.map(t=>`<span class="status-item"><span class="dot dot-wait" id="dot-${t.id}"></span>${t.label}</span>`).join('');
-  const results=await Promise.allSettled(tests.map(t=>t.fn()));
-  results.forEach((r,i)=>{
-    const dot=document.getElementById('dot-'+tests[i].id);
-    dot.className='dot dot-'+(r.status==='fulfilled'&&r.value&&(Array.isArray(r.value)?r.value.length>0:true)?'ok':'err');
-  });
-  D.nyc_members=results[0].status==='fulfilled'?results[0].value:[];
-  D.nyc_committees=results[1].status==='fulfilled'?results[1].value:[];
-  D.nyc_bills=results[2].status==='fulfilled'?results[2].value:[];
-  D.chi_persons=results[3].status==='fulfilled'?results[3].value:[];
-  if(D.nyc_members[0])console.log('NYC members:',Object.keys(D.nyc_members[0]),D.nyc_members[0]);
-  if(D.nyc_bills[0])console.log('NYC bills:',Object.keys(D.nyc_bills[0]),D.nyc_bills[0]);
-  if(D.chi_persons[0])console.log('CHI persons:',D.chi_persons[0]);
+  const R=await Promise.allSettled(tests.map(t=>t.fn()));
+  R.forEach((r,i)=>{document.getElementById('dot-'+tests[i].id).className='dot dot-'+(r.status==='fulfilled'&&r.value&&(Array.isArray(r.value)?r.value.length>0:true)?'ok':'err');});
+  D.nyc_members=R[0].status==='fulfilled'?R[0].value:[];
+  D.nyc_committees=R[1].status==='fulfilled'?R[1].value:[];
+  D.nyc_bills=R[2].status==='fulfilled'?R[2].value:[];
+  D.chi_persons=R[3].status==='fulfilled'?R[3].value:[];
   if(city==='nyc')fillNYC();else fillChi();
 }
 
-// ══ CHICAGO PERSONS ══
 async function loadChiPersons(){
-  const queries=[
-    `SELECT DISTINCT p.id, p.name, po.label as ward FROM person p JOIN membership m ON m.person_id=p.id JOIN post po ON m.post_id=po.id WHERE po.label LIKE '%Ward%' AND p.name IS NOT NULL AND (m.end_date IS NULL OR m.end_date='' OR m.end_date>=date('now')) ORDER BY po.label LIMIT 60`,
-    `SELECT DISTINCT p.id, p.name FROM person p JOIN membership m ON m.person_id=p.id JOIN organization o ON o.id=m.organization_id WHERE o.name LIKE '%Council%' AND p.name IS NOT NULL AND (m.end_date IS NULL OR m.end_date='' OR m.end_date>=date('now')) ORDER BY p.name LIMIT 60`,
-    `SELECT id, name FROM person WHERE name IS NOT NULL ORDER BY name LIMIT 80`
+  const qs=[
+    `SELECT DISTINCT p.id,p.name,po.label as ward FROM person p JOIN membership m ON m.person_id=p.id JOIN post po ON m.post_id=po.id WHERE po.label LIKE '%Ward%' AND p.name IS NOT NULL AND(m.end_date IS NULL OR m.end_date='' OR m.end_date>=date('now')) ORDER BY po.label LIMIT 60`,
+    `SELECT DISTINCT p.id,p.name FROM person p JOIN membership m ON m.person_id=p.id JOIN organization o ON o.id=m.organization_id WHERE o.name LIKE '%Council%' AND p.name IS NOT NULL AND(m.end_date IS NULL OR m.end_date='' OR m.end_date>=date('now')) ORDER BY p.name LIMIT 60`,
+    `SELECT id,name FROM person WHERE name IS NOT NULL ORDER BY name LIMIT 80`
   ];
-  for(const sql of queries){try{const d=await chiSQL(sql);if(d&&d.length>0)return d;}catch(e){}}
+  for(const sql of qs){try{const d=await chiSQL(sql);if(d&&d.length>0)return d;}catch(e){}}
   return [];
 }
 
-// ══ DROPDOWNS ══
 function fillNYC(){
   const sel=document.getElementById('sel');
   if(!D.nyc_members.length){sel.innerHTML='<option value="">NYC data unavailable</option>';return;}
   const now=new Date();
-  const current=D.nyc_members.filter(m=>{
-    if(personName(m)==='Unknown')return false;
-    const s=m.term_start?new Date(m.term_start):null;
-    const e=m.term_end?new Date(m.term_end):null;
-    if(s&&e)return s<=now&&now<=e;
-    if(s&&!e)return s<=now;
-    return false;
-  });
-  const byDist=new Map();
-  current.forEach(m=>{const d=personDistrict(m)||personName(m);if(!byDist.has(d)||(m.term_start>(byDist.get(d).term_start||'')))byDist.set(d,m);});
-  const sorted=[...byDist.values()].sort((a,b)=>(parseInt(personDistrict(a))||999)-(parseInt(personDistrict(b))||999));
+  const cur=D.nyc_members.filter(m=>{if(personName(m)==='Unknown')return false;const s=m.term_start?new Date(m.term_start):null;const e=m.term_end?new Date(m.term_end):null;if(s&&e)return s<=now&&now<=e;if(s&&!e)return s<=now;return false;});
+  const bd=new Map();cur.forEach(m=>{const d=personDistrict(m)||personName(m);if(!bd.has(d)||(m.term_start>(bd.get(d).term_start||'')))bd.set(d,m);});
+  const sorted=[...bd.values()].sort((a,b)=>(parseInt(personDistrict(a))||999)-(parseInt(personDistrict(b))||999));
   sel.innerHTML='<option value="">— Select your council member —</option>';
   sorted.forEach((m,i)=>{const o=document.createElement('option');o.value=i;const d=personDistrict(m);o.textContent=(d?'District '+d+'  ·  ':'')+personName(m);sel.appendChild(o);});
   D._nyc_sorted=sorted;
@@ -199,119 +178,15 @@ function fillNYC(){
 function fillChi(){
   const sel=document.getElementById('sel');
   if(!D.chi_persons.length){sel.innerHTML='<option value="">Chicago data unavailable</option>';return;}
-  const withWard=D.chi_persons.map(p=>{let wn=null;if(p.ward){const m=String(p.ward).match(/(\d+)/);if(m)wn=parseInt(m[1]);}return{...p,_wardNum:wn};});
-  const seen=new Map();
-  withWard.forEach(p=>{if(!p.id||!p.name)return;if(!seen.has(p.id)||(p._wardNum&&!seen.get(p.id)._wardNum))seen.set(p.id,p);});
-  const deduped=[...seen.values()].sort((a,b)=>(a._wardNum||999)-(b._wardNum||999));
+  const ww=D.chi_persons.map(p=>{let wn=null;if(p.ward){const m=String(p.ward).match(/(\d+)/);if(m)wn=parseInt(m[1]);}return{...p,_wardNum:wn};});
+  const seen=new Map();ww.forEach(p=>{if(!p.id||!p.name)return;if(!seen.has(p.id)||(p._wardNum&&!seen.get(p.id)._wardNum))seen.set(p.id,p);});
+  const dd=[...seen.values()].sort((a,b)=>(a._wardNum||999)-(b._wardNum||999));
   sel.innerHTML='<option value="">— Select your alder —</option>';
-  deduped.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(p._wardNum?'Ward '+p._wardNum+'  ·  ':'')+p.name;sel.appendChild(o);});
-  D._chi_sorted=deduped;
+  dd.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(p._wardNum?'Ward '+p._wardNum+'  ·  ':'')+p.name;sel.appendChild(o);});
+  D._chi_sorted=dd;
 }
-function switchCity(c){
-  city=c;
-  document.getElementById('tab-nyc').classList.toggle('active',c==='nyc');
-  document.getElementById('tab-chi').classList.toggle('active',c==='chi');
-  document.getElementById('result').innerHTML='';
-  document.getElementById('go').disabled=true;
-  if(c==='nyc')fillNYC();else fillChi();
-}
+function switchCity(c){city=c;document.getElementById('tab-nyc').classList.toggle('active',c==='nyc');document.getElementById('tab-chi').classList.toggle('active',c==='chi');document.getElementById('result').innerHTML='';document.getElementById('go').disabled=true;if(c==='nyc')fillNYC();else fillChi();}
 function go(){if(city==='nyc')showNYC();else showChi();}
-
-// ══════════════════════════════════════════════════
-// VOTE DATA LOADERS
-// ══════════════════════════════════════════════════
-
-// Chicago: try multiple query shapes since column names vary
-async function loadChiVotes(personId) {
-  const queries = [
-    // Try voter_id first (OCD standard)
-    `SELECT pv.option, ve.motion_text, ve.start_date, ve.result, b.identifier as bill_id, b.title as bill_title
-     FROM personvote pv
-     JOIN voteevent ve ON ve.id = pv.vote_event_id
-     LEFT JOIN bill b ON ve.bill_id = b.id
-     WHERE pv.voter_id = '${personId}'
-     ORDER BY ve.start_date DESC LIMIT 40`,
-    // Try person_id
-    `SELECT pv.option, ve.motion_text, ve.start_date, ve.result, b.identifier as bill_id, b.title as bill_title
-     FROM personvote pv
-     JOIN voteevent ve ON ve.id = pv.vote_event_id
-     LEFT JOIN bill b ON ve.bill_id = b.id
-     WHERE pv.person_id = '${personId}'
-     ORDER BY ve.start_date DESC LIMIT 40`,
-    // Simplest: just personvote
-    `SELECT * FROM personvote WHERE voter_id = '${personId}' ORDER BY rowid DESC LIMIT 5`,
-    `SELECT * FROM personvote WHERE person_id = '${personId}' ORDER BY rowid DESC LIMIT 5`,
-  ];
-  for (const sql of queries) {
-    try {
-      const data = await chiSQL(sql);
-      if (data && data.length > 0) {
-        console.log('CHI votes loaded, count:', data.length, 'query:', sql.slice(0,60), 'first:', data[0]);
-        return data;
-      }
-    } catch(e) { console.warn('CHI vote query failed:', e.message, sql.slice(0,60)); }
-  }
-  // Log table schema for debugging
-  try {
-    const schema = await chiSQL(`SELECT sql FROM sqlite_master WHERE name='personvote'`);
-    console.log('personvote schema:', schema);
-  } catch(e) {}
-  return [];
-}
-
-// NYC: use Anthropic API to proxy-fetch Legistar vote data (Legistar is CORS-blocked from browsers)
-async function loadNYCVotes(memberId, memberName) {
-  // First try direct Legistar (in case CORS works)
-  try {
-    const url = `${NYC_LEGISTAR}/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc desc`;
-    const r = await fetch(url);
-    if (r.ok) {
-      const data = await r.json();
-      if (data && data.length > 0) {
-        console.log('NYC votes via direct Legistar:', data.length);
-        return { source: 'legistar', votes: data };
-      }
-    }
-  } catch(e) { console.warn('Direct Legistar failed (CORS expected):', e.message); }
-
-  // Use Claude as a server-side proxy to fetch the Legistar JSON
-  const legistarUrl = `https://webapi.legistar.com/v1/nyc/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc%20desc`;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{role:'user', content:
-          `Fetch the JSON data from this URL and return it exactly as received: ${legistarUrl}
-
-Return ONLY the raw JSON array from the API response. No explanation, no markdown, no code fences. Just the JSON array starting with [ and ending with ]. If the fetch fails or returns no data, return exactly: []`
-        }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
-      })
-    });
-    const d = await res.json();
-    const text = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
-    console.log('Claude proxy response length:', text.length, 'preview:', text.slice(0,200));
-    const match = text.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        const votes = JSON.parse(match[0]);
-        if (votes.length > 0) {
-          console.log('NYC votes via Claude proxy:', votes.length);
-          // Detect format: if it has VoteValueName it's raw Legistar, otherwise search results
-          if (votes[0].VoteValueName || votes[0].VoteEventItemMatterName) {
-            return { source: 'legistar', votes };
-          }
-          return { source: 'search', votes };
-        }
-      } catch(pe) { console.warn('JSON parse failed:', pe.message); }
-    }
-  } catch(e) { console.warn('Claude proxy failed:', e.message); }
-
-  return { source: 'none', votes: [] };
-}
 
 // ══════════════════════════════════════════════════
 // NYC VIEW
@@ -319,29 +194,31 @@ Return ONLY the raw JSON array from the API response. No explanation, no markdow
 async function showNYC(){
   const idx=+document.getElementById('sel').value;
   const member=D._nyc_sorted[idx];if(!member)return;
-  const name=personName(member), district=personDistrict(member);
-  const memberId=member.council_member_id||member.office_id||'';
+  const name=personName(member),district=personDistrict(member);
 
   document.getElementById('result').innerHTML=`<div class="loading-box"><div class="spin"></div><div class="load-text">Loading ${name}…</div></div>`;
 
-  // Committees
   const lastName=name.split(' ').pop().toLowerCase();
   let myComms=D.nyc_committees.filter(c=>{const vals=Object.values(c).map(v=>String(v).toLowerCase());return vals.some(v=>v.includes(lastName));});
   if(myComms.length===0&&district)myComms=D.nyc_committees.filter(c=>{const vals=Object.values(c).map(v=>String(v));return vals.some(v=>v===String(district));});
   const commMap=new Map();myComms.forEach(c=>{const cn=committeeName(c);if(!commMap.has(cn))commMap.set(cn,committeeRole(c));});
 
-  // Bills
   const sponsorBills=D.nyc_bills.filter(b=>(b.primary_sponsor||'').toLowerCase().includes(lastName));
 
-  // Votes — try Legistar direct, then Claude proxy
-  const voteResult = await loadNYCVotes(memberId, name);
-  const votes = voteResult.votes;
-  const voteSource = voteResult.source;
+  // Build activity feed from bill data (intro, committee hearing, passed, enacted, vetoed)
+  const activity=[];
+  sponsorBills.forEach(b=>{
+    if(b.intro_date) activity.push({date:b.intro_date, type:'intro', label:'Introduced', title:b.title||b.name||'', id:b.file_number, data:b});
+    if(b.agenda_date&&b.agenda_date!==b.intro_date) activity.push({date:b.agenda_date, type:'action', label:'Agenda', title:(b.title||b.name||'')+(b.committee?' — '+b.committee:''), id:b.file_number, data:b});
+    if(b.passed_date) activity.push({date:b.passed_date, type:'passed', label:'Passed', title:b.title||b.name||'', id:b.file_number, data:b});
+    if(b.enacted_date) activity.push({date:b.enacted_date, type:'enacted', label:'Enacted', title:b.title||b.name||'', id:b.file_number, data:b});
+  });
+  activity.sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   window._billData=[];
   let html='';
   html+=repHeader(name,`NYC Council Member · District ${district}`,
-    [[commMap.size,'Committees'],[sponsorBills.length,'Bills'],[votes.length,'Votes']]);
+    [[commMap.size,'Committees'],[sponsorBills.length,'Bills'],[activity.length,'Activities']]);
 
   if(commMap.size>0){
     html+=`<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${commMap.size}</span></div><div class="tag-wrap">`;
@@ -351,7 +228,7 @@ async function showNYC(){
 
   html+=`<div class="grid2">`;
 
-  // Bills column
+  // Left: legislation
   html+=`<div class="col"><div class="col-head">Legislation sponsored <span class="col-count">${sponsorBills.length}</span></div>`;
   if(!sponsorBills.length)html+=`<div class="empty">No legislation found</div>`;
   else sponsorBills.slice(0,20).forEach(b=>{
@@ -362,18 +239,12 @@ async function showNYC(){
   });
   html+=`</div>`;
 
-  // Votes column
-  html+=`<div class="col"><div class="col-head">Vote history <span class="col-count">${votes.length}</span></div>`;
-  if(!votes.length)html+=`<div class="empty">Vote records not available — Legistar API may require a token</div>`;
-  else if(voteSource==='legistar') votes.slice(0,25).forEach(v=>{
-    const option=(v.VoteValueName||'').toLowerCase();
-    const cls=option.includes('aye')||option.includes('yes')?'yes':option.includes('no')||option.includes('nay')?'no':option.includes('abstain')||option.includes('excused')?'abs':'other';
-    html+=`<div class="vote-row"><div class="vote-badge ${cls}">${v.VoteValueName||'?'}</div><div><div class="vote-title">${v.VoteEventItemMatterName||v.VoteEventItemMatterFile||'Vote'}</div><div class="vote-meta">${fmtDate(v.VoteLastModifiedUtc)} ${v.VoteEventItemMatterType?'· '+v.VoteEventItemMatterType:''}</div></div></div>`;
-  });
-  else votes.slice(0,25).forEach(v=>{
-    const option=(v.vote||'').toLowerCase();
-    const cls=option.includes('yes')||option.includes('aye')?'yes':option.includes('no')||option.includes('nay')?'no':'abs';
-    html+=`<div class="vote-row"><div class="vote-badge ${cls}">${v.vote||'?'}</div><div><div class="vote-title">${v.title||v.bill||'Vote'}</div><div class="vote-meta">${v.date||''} ${v.result?'· Result: '+v.result:''}</div></div></div>`;
+  // Right: activity timeline
+  html+=`<div class="col"><div class="col-head">Activity timeline <span class="col-count">${activity.length}</span></div>`;
+  if(!activity.length)html+=`<div class="empty">No recent activity</div>`;
+  else activity.slice(0,30).forEach(a=>{
+    const cls=a.type==='intro'?'sponsor':a.type==='passed'||a.type==='enacted'?'vote-y':'action';
+    html+=`<div class="act-row"><div class="act-type ${cls}">${a.label}</div><div><div class="act-title">${(a.title||'').slice(0,160)}</div><div class="act-meta">${fmtDate(a.date)} · ${a.id||''}</div></div></div>`;
   });
   html+=`</div></div>`;
 
@@ -391,15 +262,52 @@ async function showChi(){
 
   document.getElementById('result').innerHTML=`<div class="loading-box"><div class="spin"></div><div class="load-text">Loading ${name}…</div></div>`;
 
-  const [billsR,votesR,commsR]=await Promise.allSettled([
-    chiSQL(`SELECT b.id, b.identifier, b.title, b.classification, b.updated_at FROM bill b JOIN billsponsorship bs ON bs.bill_id=b.id WHERE bs.person_id='${personId}' ORDER BY b.updated_at DESC LIMIT 30`),
+  // Fetch bills, bill actions on their bills, votes, sponsorships, and committees in parallel
+  const [billsR,actionsR,votesR,commsR]=await Promise.allSettled([
+    chiSQL(`SELECT b.id,b.identifier,b.title,b.classification,b.updated_at,b.created_at FROM bill b JOIN billsponsorship bs ON bs.bill_id=b.id WHERE bs.person_id='${personId}' ORDER BY b.updated_at DESC LIMIT 40`),
+    chiSQL(`SELECT ba.description,ba.date,ba.classification as action_type,b.identifier,b.title FROM billaction ba JOIN bill b ON b.id=ba.bill_id JOIN billsponsorship bs ON bs.bill_id=b.id WHERE bs.person_id='${personId}' AND ba.date>=date('now','-120 days') ORDER BY ba.date DESC LIMIT 40`),
     loadChiVotes(personId),
-    chiSQL(`SELECT DISTINCT o.name, m.role FROM membership m JOIN organization o ON o.id=m.organization_id WHERE m.person_id='${personId}' LIMIT 25`)
+    chiSQL(`SELECT DISTINCT o.name,m.role FROM membership m JOIN organization o ON o.id=m.organization_id WHERE m.person_id='${personId}' LIMIT 25`)
   ]);
 
   const bills=billsR.status==='fulfilled'?billsR.value:[];
+  const actions=actionsR.status==='fulfilled'?actionsR.value:[];
   const votes=votesR.status==='fulfilled'?votesR.value:[];
   const comms=(commsR.status==='fulfilled'?commsR.value:[]).filter(c=>c.name&&!c.name.match(/^City Council$/i));
+
+  // Build unified activity feed
+  const activity=[];
+
+  // Sponsorships — when they introduced/co-sponsored
+  bills.forEach(b=>{
+    if(b.created_at) activity.push({date:b.created_at, type:'sponsor', label:'Sponsored', title:b.title||'', id:b.identifier, billId:b.id});
+  });
+
+  // Bill actions — committee referrals, hearings, passages on their bills
+  actions.forEach(a=>{
+    activity.push({date:a.date, type:'action', label:a.description?a.description.slice(0,20):'Action', title:(a.title||''), id:a.identifier, desc:a.description});
+  });
+
+  // Votes — how they voted on contested items
+  votes.forEach(v=>{
+    const opt=(v.option||'').toLowerCase();
+    const label=opt.includes('yes')||opt.includes('aye')?'Voted Yes':opt.includes('no')||opt.includes('nay')?'Voted No':'Vote';
+    activity.push({date:v.start_date, type:opt.includes('yes')||opt.includes('aye')?'vote-y':opt.includes('no')||opt.includes('nay')?'vote-n':'vote-o', label, title:v.bill_title||v.motion_text||'', id:v.bill_id||''});
+  });
+
+  // Sort by date descending
+  activity.sort((a,b)=>{
+    const da=a.date?new Date(a.date):new Date(0);
+    const db=b.date?new Date(b.date):new Date(0);
+    return db-da;
+  });
+
+  // Dedup: remove actions with same date+id+label
+  const seen=new Set();
+  const dedupedActivity=activity.filter(a=>{
+    const key=(a.date||'').slice(0,10)+'|'+(a.id||'')+'|'+a.label;
+    if(seen.has(key))return false;seen.add(key);return true;
+  });
 
   const now=new Date(),ago30=new Date(now-30*864e5);
   const recentBills=bills.filter(b=>b.updated_at&&new Date(b.updated_at)>ago30);
@@ -410,7 +318,7 @@ async function showChi(){
   let html='';
   const subtitle='Chicago Alder'+(wardNum?' · Ward '+wardNum:'')+' · City Council';
   html+=repHeader(name,subtitle,
-    [[bills.length,'Bills total'],[votes.length,'Votes'],[comms.length,'Committees']]);
+    [[bills.length,'Bills'],[dedupedActivity.length,'Activities'],[comms.length,'Committees']]);
 
   if(comms.length>0){
     html+=`<div class="fullrow"><div class="col-head">Committee memberships <span class="col-count">${comms.length}</span></div><div class="tag-wrap">`;
@@ -420,7 +328,7 @@ async function showChi(){
 
   html+=`<div class="grid2">`;
 
-  // Bills
+  // Left: bills
   html+=`<div class="col"><div class="col-head">${billLabel} <span class="col-count">${showBills.length}</span></div>`;
   if(!showBills.length)html+=`<div class="empty">No legislation found</div>`;
   else showBills.forEach(b=>{
@@ -431,19 +339,30 @@ async function showChi(){
   });
   html+=`</div>`;
 
-  // Votes — these are divided (non-unanimous) roll call votes
-  html+=`<div class="col"><div class="col-head">Divided roll call votes <span class="col-count">${votes.length}</span></div>`;
-  if(!votes.length)html+=`<div class="empty">No divided vote records found — most Chicago legislation passes unanimously</div>`;
-  else votes.forEach(v=>{
-    const opt=(v.option||'').toLowerCase();
-    const cls=opt.includes('yes')||opt.includes('aye')?'yes':opt.includes('no')||opt.includes('nay')?'no':opt.includes('abstain')||opt.includes('excused')||opt.includes('absent')?'abs':'other';
-    const title=v.bill_title||v.motion_text||v.bill_id||'Vote';
-    html+=`<div class="vote-row"><div class="vote-badge ${cls}">${v.option||'?'}</div><div><div class="vote-title">${title.slice(0,180)}</div><div class="vote-meta">${fmtDate(v.start_date)} ${v.bill_id?'· '+v.bill_id:''}</div></div></div>`;
+  // Right: unified activity feed
+  html+=`<div class="col"><div class="col-head">Activity timeline <span class="col-count">${dedupedActivity.length}</span></div>`;
+  if(!dedupedActivity.length)html+=`<div class="empty">No recent activity found</div>`;
+  else dedupedActivity.slice(0,35).forEach(a=>{
+    const cls=a.type==='sponsor'?'sponsor':a.type==='vote-y'?'vote-y':a.type==='vote-n'?'vote-n':a.type==='vote-o'?'vote-o':'action';
+    html+=`<div class="act-row"><div class="act-type ${cls}">${a.label}</div><div><div class="act-title">${(a.title||'').slice(0,160)}</div><div class="act-meta">${fmtDate(a.date)}${a.id?' · '+a.id:''}${a.desc?' — '+a.desc.slice(0,80):''}</div></div></div>`;
   });
   html+=`</div></div>`;
 
   html+=`<div class="foot-note">DATA: <a href="https://chicago.councilmatic.org" target="_blank">CHICAGO COUNCILMATIC</a> · <a href="https://puddle.datamade.us/chicago_council" target="_blank">DATAMADE</a></div>`;
   document.getElementById('result').innerHTML=html;
+}
+
+// ══ CHICAGO VOTE LOADER ══
+async function loadChiVotes(personId){
+  const qs=[
+    `SELECT pv.option,ve.motion_text,ve.start_date,ve.result,b.identifier as bill_id,b.title as bill_title FROM personvote pv JOIN voteevent ve ON ve.id=pv.vote_event_id LEFT JOIN bill b ON ve.bill_id=b.id WHERE pv.voter_id='${personId}' ORDER BY ve.start_date DESC LIMIT 30`,
+    `SELECT pv.option,ve.motion_text,ve.start_date,ve.result,b.identifier as bill_id,b.title as bill_title FROM personvote pv JOIN voteevent ve ON ve.id=pv.vote_event_id LEFT JOIN bill b ON ve.bill_id=b.id WHERE pv.person_id='${personId}' ORDER BY ve.start_date DESC LIMIT 30`,
+    `SELECT * FROM personvote WHERE voter_id='${personId}' LIMIT 5`,
+    `SELECT * FROM personvote WHERE person_id='${personId}' LIMIT 5`,
+  ];
+  for(const sql of qs){try{const d=await chiSQL(sql);if(d&&d.length>0){console.log('CHI votes:',d.length,d[0]);return d;}}catch(e){}}
+  try{const s=await chiSQL(`SELECT sql FROM sqlite_master WHERE name='personvote'`);console.log('personvote schema:',s);}catch(e){}
+  return [];
 }
 
 // ══ BILL DETAIL ══
@@ -455,11 +374,10 @@ async function toggleBillDetail(rowEl,billIdx){
   const panel=document.createElement('div');panel.className='bill-detail';
   panel.innerHTML='<div class="bill-detail-title">Loading…</div>';
   rowEl.after(panel);
-
   if(bd.city==='chi'&&bd.id){
     try{
       const eid=bd.id.replace(/'/g,"''");
-      const actions=await chiSQL(`SELECT ba.description, ba.date, ba.classification, ba."order" FROM billaction ba WHERE ba.bill_id='${eid}' ORDER BY ba."order" ASC, ba.date ASC LIMIT 20`);
+      const actions=await chiSQL(`SELECT ba.description,ba.date,ba.classification,ba."order" FROM billaction ba WHERE ba.bill_id='${eid}' ORDER BY ba."order" ASC,ba.date ASC LIMIT 20`);
       let inner=`<div class="bill-detail-title">Action history — ${bd.identifier||''}</div>`;
       if(!actions.length)inner+='<div style="color:var(--muted);font-size:.75rem;">No action history found.</div>';
       else actions.forEach(a=>{inner+=`<div class="action-row"><div class="action-date">${fmtDate(a.date)}</div><div class="action-desc">${a.description||a.classification||'Action'}</div></div>`;});
@@ -479,13 +397,9 @@ async function toggleBillDetail(rowEl,billIdx){
 }
 
 // ══ SHARED ══
-function repHeader(name,subtitle,stats){
-  return `<div class="rep-bar"><div class="rep-initial">${initials(name)}</div><div class="rep-info"><div class="rep-name">${name}</div><div class="rep-sub">${subtitle}</div></div><div class="rep-stats">${stats.map(([n,l])=>`<div><div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`).join('')}</div></div>`;
-}
-function statusPill(cls){const s=(cls||'').toLowerCase();if(s.includes('pass')||s.includes('enact')||s.includes('approv'))return{c:'pill-pass',t:cls};return{c:'pill-pend',t:cls||'Filed'};}
-
-// ══ UTILS ══
-async function jfetch(url){const r=await fetch(url);if(!r.ok)throw new Error(`HTTP ${r.status}`);const d=await r.json();return Array.isArray(d)?d:[];}
+function repHeader(n,sub,stats){return `<div class="rep-bar"><div class="rep-initial">${initials(n)}</div><div class="rep-info"><div class="rep-name">${n}</div><div class="rep-sub">${sub}</div></div><div class="rep-stats">${stats.map(([v,l])=>`<div><div class="stat-n">${v}</div><div class="stat-l">${l}</div></div>`).join('')}</div></div>`;}
+function statusPill(c){const s=(c||'').toLowerCase();if(s.includes('pass')||s.includes('enact')||s.includes('approv'))return{c:'pill-pass',t:c};return{c:'pill-pend',t:c||'Filed'};}
+async function jfetch(u){const r=await fetch(u);if(!r.ok)throw new Error(`HTTP ${r.status}`);const d=await r.json();return Array.isArray(d)?d:[];}
 async function chiSQL(sql){return jfetch(`${CHI}.json?sql=${encodeURIComponent(sql)}&_shape=array`);}
 function initials(n){return(n||'?').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function fmtDate(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch{return s;}}
