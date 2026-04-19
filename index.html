@@ -232,13 +232,15 @@ async function boot() {
 // LOAD CHICAGO PERSONS WITH WARD NUMBERS
 // ════════════════════════════════════════════════════
 async function loadChiPersons() {
-  // Try to get persons with ward info via post labels
+  // Try to get CURRENT persons with ward info
+  // Memberships with no end_date or end_date in the future are current
   const queries = [
     `SELECT DISTINCT p.id, p.name, po.label as ward
      FROM person p
      JOIN membership m ON m.person_id = p.id
      JOIN post po ON m.post_id = po.id
      WHERE po.label LIKE '%Ward%' AND p.name IS NOT NULL
+       AND (m.end_date IS NULL OR m.end_date = '' OR m.end_date >= date('now'))
      ORDER BY po.label LIMIT 60`,
     `SELECT DISTINCT p.id, p.name, po.label as ward
      FROM person p
@@ -246,12 +248,14 @@ async function loadChiPersons() {
      LEFT JOIN post po ON m.post_id = po.id
      JOIN organization o ON o.id = m.organization_id
      WHERE o.name LIKE '%Council%' AND p.name IS NOT NULL
+       AND (m.end_date IS NULL OR m.end_date = '' OR m.end_date >= date('now'))
      ORDER BY p.name LIMIT 60`,
     `SELECT DISTINCT p.id, p.name
      FROM person p
      JOIN membership m ON m.person_id = p.id
      JOIN organization o ON o.id = m.organization_id
-     WHERE (o.name LIKE '%Council%' OR o.name LIKE '%Alderm%') AND p.name IS NOT NULL
+     WHERE (o.name LIKE '%Council%') AND p.name IS NOT NULL
+       AND (m.end_date IS NULL OR m.end_date = '' OR m.end_date >= date('now'))
      ORDER BY p.name LIMIT 60`,
     `SELECT id, name FROM person WHERE name IS NOT NULL ORDER BY name LIMIT 80`
   ];
@@ -260,7 +264,7 @@ async function loadChiPersons() {
     try {
       const data = await chiSQL(sql);
       if (data && data.length > 0) {
-        console.log('CHI persons loaded with query, first record:', data[0]);
+        console.log('CHI persons loaded, count:', data.length, 'first:', data[0]);
         return data;
       }
     } catch(e) { console.warn('CHI persons query failed:', e.message); }
@@ -277,17 +281,27 @@ function fillNYC() {
     sel.innerHTML = '<option value="">NYC data unavailable — try Chicago</option>';
     return;
   }
-  // Deduplicate by name, keep most recent term
-  const seen = new Map();
-  D.nyc_members.forEach(m => {
-    const n = personName(m);
-    if (n === 'Unknown') return;
-    if (!seen.has(n) || (m.term_start && (!seen.get(n).term_start || m.term_start > seen.get(n).term_start))) {
-      seen.set(n, m);
+  const now = new Date();
+  // Filter to current members only: term_start <= now <= term_end
+  const current = D.nyc_members.filter(m => {
+    const name = personName(m);
+    if (name === 'Unknown') return false;
+    const start = m.term_start ? new Date(m.term_start) : null;
+    const end   = m.term_end   ? new Date(m.term_end)   : null;
+    if (start && end) return start <= now && now <= end;
+    if (start && !end) return start <= now; // no end date = still active
+    return false;
+  });
+  // One person per district — keep the one with the latest term_start
+  const byDistrict = new Map();
+  current.forEach(m => {
+    const d = personDistrict(m) || personName(m);
+    if (!byDistrict.has(d) || (m.term_start > (byDistrict.get(d).term_start || ''))) {
+      byDistrict.set(d, m);
     }
   });
   // Sort by district number
-  const sorted = [...seen.values()].sort((a,b) => {
+  const sorted = [...byDistrict.values()].sort((a,b) => {
     const da = parseInt(personDistrict(a)) || 999;
     const db = parseInt(personDistrict(b)) || 999;
     return da - db;
