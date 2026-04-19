@@ -131,13 +131,14 @@ body{background:var(--paper);color:var(--ink);font-family:'Barlow',sans-serif;fo
 const NYC_MEMBERS    = 'https://data.cityofnewyork.us/resource/uvw5-9znb.json?$limit=200';
 const NYC_COMMITTEES = 'https://data.cityofnewyork.us/resource/aabe-yfm9.json?$limit=5000';
 const NYC_MEETINGS   = 'https://data.cityofnewyork.us/resource/m48u-yjt8.json?$limit=200&$order=meeting_date%20DESC';
+const NYC_BILLS      = 'https://data.cityofnewyork.us/resource/6ctv-n46c.json?$limit=500&$order=intro_date%20DESC';
 const CHI            = 'https://puddle.datamade.us/chicago_council';
 
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
 let city = 'nyc';
-let D = { nyc_members:[], nyc_committees:[], nyc_meetings:[], chi_persons:[] };
+let D = { nyc_members:[], nyc_committees:[], nyc_meetings:[], nyc_bills:[], chi_persons:[] };
 
 document.getElementById('today').textContent =
   new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
@@ -194,6 +195,7 @@ async function boot() {
     { id:'nyc-members',    label:'NYC members',    fn: () => jfetch(NYC_MEMBERS) },
     { id:'nyc-committees', label:'NYC committees', fn: () => jfetch(NYC_COMMITTEES) },
     { id:'nyc-meetings',   label:'NYC meetings',   fn: () => jfetch(NYC_MEETINGS) },
+    { id:'nyc-bills',      label:'NYC bills',      fn: () => jfetch(NYC_BILLS) },
     { id:'chi-persons',    label:'CHI persons',    fn: () => loadChiPersons() },
     { id:'chi-events',     label:'CHI events',     fn: () => chiSQL(`SELECT COUNT(*) as n FROM event LIMIT 1`) },
   ];
@@ -217,12 +219,14 @@ async function boot() {
   D.nyc_members    = results[0].status === 'fulfilled' ? results[0].value : [];
   D.nyc_committees = results[1].status === 'fulfilled' ? results[1].value : [];
   D.nyc_meetings   = results[2].status === 'fulfilled' ? results[2].value : [];
-  D.chi_persons    = results[3].status === 'fulfilled' ? results[3].value : [];
+  D.nyc_bills      = results[3].status === 'fulfilled' ? results[3].value : [];
+  D.chi_persons    = results[4].status === 'fulfilled' ? results[4].value : [];
 
   // Debug: log first record of each
   if (D.nyc_members[0])    console.log('NYC members fields:', Object.keys(D.nyc_members[0]), D.nyc_members[0]);
   if (D.nyc_committees[0]) console.log('NYC committees fields:', Object.keys(D.nyc_committees[0]), D.nyc_committees[0]);
   if (D.nyc_meetings[0])   console.log('NYC meetings fields:', Object.keys(D.nyc_meetings[0]), D.nyc_meetings[0]);
+  if (D.nyc_bills[0])      console.log('NYC bills fields:', Object.keys(D.nyc_bills[0]), D.nyc_bills[0]);
   if (D.chi_persons[0])    console.log('CHI person fields:', Object.keys(D.chi_persons[0]), D.chi_persons[0]);
 
   if (city === 'nyc') fillNYC(); else fillChi();
@@ -381,34 +385,33 @@ function showNYC() {
   const name     = personName(member);
   const district = personDistrict(member);
 
-  // Debug: log the actual field names so we can see what's there
-  if (D.nyc_committees[0]) console.log('Committee record keys:', Object.keys(D.nyc_committees[0]), 'Sample:', D.nyc_committees[0]);
-  if (D.nyc_meetings[0])   console.log('Meeting record keys:', Object.keys(D.nyc_meetings[0]), 'Sample:', D.nyc_meetings[0]);
-
-  // Match committees: try every text field in each record for the member's name or last name
+  // ── Committees ──
   const lastName = name.split(' ').pop().toLowerCase();
   const nameLower = name.toLowerCase();
   let myComms = D.nyc_committees.filter(c => {
-    // Search across ALL string values in the record for this member's name
     const vals = Object.values(c).map(v => String(v).toLowerCase());
     return vals.some(v => v === nameLower || v.includes(nameLower) || v.includes(lastName));
   });
-  // If still no matches, try by district number across all fields
   if (myComms.length === 0 && district) {
     myComms = D.nyc_committees.filter(c => {
       const vals = Object.values(c).map(v => String(v));
       return vals.some(v => v === String(district));
     });
   }
-  // Dedup by committee name
   const commMap = new Map();
   myComms.forEach(c => {
     const cn = committeeName(c);
     if (!commMap.has(cn)) commMap.set(cn, committeeRole(c));
   });
 
-  // Meetings: find any date-like field and use it
-  // First, figure out which field holds the date
+  // ── Legislation ──
+  // Fields: primary_sponsor, file_number, intro_date, status, title, name, committee
+  const sponsorBills = D.nyc_bills.filter(b => {
+    const sponsor = (b.primary_sponsor || '').toLowerCase();
+    return sponsor.includes(lastName);
+  });
+
+  // ── Meetings — dedup by name+date ──
   let dateKey = null;
   if (D.nyc_meetings[0]) {
     const keys = Object.keys(D.nyc_meetings[0]);
@@ -417,35 +420,35 @@ function showNYC() {
       const v = D.nyc_meetings[0][k];
       return typeof v === 'string' && v.match(/^\d{4}-\d{2}/);
     });
-    console.log('Meeting date field:', dateKey);
   }
 
   const now = new Date();
-
-  // Get the date from a meeting using the discovered key
   function mDate(m) {
     const v = dateKey ? m[dateKey] : meetingDate(m);
     return v ? new Date(v) : null;
   }
 
-  // Get the name/title from a meeting — try all plausible fields
-  function mName(m) {
-    return meetingName(m);
-  }
+  // Dedup meetings by name + date combo
+  const meetingSeen = new Set();
+  const dedupedMeetings = D.nyc_meetings.filter(m => {
+    const d = mDate(m);
+    if (!d) return false;
+    const key = meetingName(m) + '|' + d.toISOString().slice(0,10);
+    if (meetingSeen.has(key)) return false;
+    meetingSeen.add(key);
+    return true;
+  });
 
-  const allMeetings = D.nyc_meetings.filter(m => mDate(m));
-  const upcoming = allMeetings.filter(m => mDate(m) >= now)
+  const upcoming = dedupedMeetings.filter(m => mDate(m) >= now)
     .sort((a,b) => mDate(a) - mDate(b)).slice(0, 20);
-  
-  // Recent: try 30d, then 90d, then just show latest 20
-  let recentLabel = 'Recent meetings';
-  let recentList = allMeetings.filter(m => mDate(m) < now)
+  const recentList = dedupedMeetings.filter(m => mDate(m) < now)
     .sort((a,b) => mDate(b) - mDate(a)).slice(0, 20);
 
+  // ── Render ──
   let html = '';
 
   html += repHeader(name, `NYC Council Member · District ${district}`, '',
-    [[commMap.size, 'Committees'], [upcoming.length, 'Upcoming'], [recentList.length, 'Recent']]);
+    [[commMap.size, 'Committees'], [sponsorBills.length, 'Bills'], [upcoming.length, 'Upcoming']]);
 
   // Committees
   if (commMap.size > 0) {
@@ -457,11 +460,51 @@ function showNYC() {
     html += `</div></div>`;
   }
 
-  // 2-col: upcoming | recent (using discovered date key)
+  // 2-col: legislation | meetings
   html += `<div class="grid2">`;
-  html += evtColRaw('Upcoming meetings', upcoming, dateKey, true);
-  html += evtColRaw(recentLabel, recentList, dateKey, false);
+
+  // Bills column
+  html += `<div class="col"><div class="col-head">Legislation sponsored <span class="col-count">${sponsorBills.length}</span></div>`;
+  if (sponsorBills.length === 0) {
+    html += `<div class="empty">No legislation found for this member</div>`;
+  } else {
+    if (!window._billData) window._billData = [];
+    sponsorBills.slice(0, 20).forEach(b => {
+      const st = b.status || 'Filed';
+      const pillCls = statusPill(st);
+      const billIdx = window._billData.length;
+      window._billData.push({ id: b.matter_id, identifier: b.file_number, city: 'nyc', data: b });
+      html += `<div class="row" onclick="toggleBillDetail(this, ${billIdx})">
+        <div class="row-id">${b.file_number||'—'}<span class="pill ${pillCls.c}">${pillCls.t}</span></div>
+        <div class="row-title">${(b.title || b.name || '').slice(0,200)}</div>
+        <div class="row-date">Intro: ${fmtDate(b.intro_date)} ${b.committee ? '· '+b.committee : ''}</div>
+      </div>`;
+    });
+  }
   html += `</div>`;
+
+  // Meetings column (deduped)
+  const allMtgs = [...upcoming, ...recentList];
+  html += `<div class="col"><div class="col-head">Meetings & events <span class="col-count">${allMtgs.length}</span></div>`;
+  if (allMtgs.length === 0) {
+    html += `<div class="empty">None found in dataset</div>`;
+  } else {
+    allMtgs.forEach(m => {
+      const d = mDate(m);
+      const isUp = d >= now;
+      html += `<div class="evt-row">
+        <div>
+          <div class="evt-day">${d ? d.getDate() : '?'}</div>
+          <div class="evt-mon">${d ? d.toLocaleString('en-US',{month:'short'}) : ''}</div>
+        </div>
+        <div>
+          <div class="evt-name">${meetingName(m)}${isUp?'<span class="pill pill-up">upcoming</span>':''}</div>
+          <div class="evt-sub">${meetingLocation(m)} ${meetingStatus(m)?'· '+meetingStatus(m):''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div></div>`;
 
   html += `<div class="foot-note">DATA: <a href="https://data.cityofnewyork.us" target="_blank">NYC OPEN DATA</a> · <a href="https://legistar.council.nyc.gov" target="_blank">LEGISTAR</a></div>`;
 
@@ -649,10 +692,32 @@ async function toggleBillDetail(rowEl, billIdx) {
       panel.innerHTML = `<div class="bill-detail-title">Error loading details</div><div style="font-size:.75rem;color:var(--accent);">${e.message}</div>`;
     }
   } else {
-    // NYC — link to Legistar
-    panel.innerHTML = `<div class="bill-detail-title">NYC legislation details</div>
-      <div style="font-size:.78rem;">Detailed bill history is available on the NYC Council Legistar portal.</div>
-      <a class="action-link" href="https://legistar.council.nyc.gov/Legislation.aspx" target="_blank">Search on Legistar →</a>`;
+    // NYC — show bill details from the data we already have
+    const b = billData.data || {};
+    let inner = `<div class="bill-detail-title">Bill details — ${identifier || b.file_number || ''}</div>`;
+    const rows = [
+      ['Status', b.status],
+      ['Introduced', fmtDate(b.intro_date)],
+      ['Committee', b.committee],
+      ['Agenda date', fmtDate(b.agenda_date)],
+      ['Passed', fmtDate(b.passed_date)],
+      ['Enacted', fmtDate(b.enacted_date)],
+      ['Local law', b.local_law_number],
+    ].filter(([,v]) => v && v !== '—' && v !== 'NA');
+    if (rows.length > 0) {
+      rows.forEach(([label, val]) => {
+        inner += `<div class="action-row">
+          <div class="action-date">${label}</div>
+          <div class="action-desc">${val}</div>
+        </div>`;
+      });
+    }
+    if (b.summary && b.summary !== 'NA') {
+      inner += `<div style="margin-top:.5rem;font-size:.78rem;color:#555;font-style:italic;">${b.summary}</div>`;
+    }
+    const fileNum = (b.file_number || '').replace(/\s+/g, '+');
+    inner += `<a class="action-link" href="https://legistar.council.nyc.gov/LegislationDetail.aspx?ID=${b.matter_id || ''}&GUID=0" target="_blank">View on Legistar →</a>`;
+    panel.innerHTML = inner;
   }
 }
 
