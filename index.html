@@ -218,6 +218,93 @@ function switchCity(c){
 function go(){if(city==='nyc')showNYC();else showChi();}
 
 // ══════════════════════════════════════════════════
+// VOTE DATA LOADERS
+// ══════════════════════════════════════════════════
+
+// Chicago: try multiple query shapes since column names vary
+async function loadChiVotes(personId) {
+  const queries = [
+    // Try voter_id first (OCD standard)
+    `SELECT pv.option, ve.motion_text, ve.start_date, ve.result, b.identifier as bill_id, b.title as bill_title
+     FROM personvote pv
+     JOIN voteevent ve ON ve.id = pv.vote_event_id
+     LEFT JOIN bill b ON ve.bill_id = b.id
+     WHERE pv.voter_id = '${personId}'
+     ORDER BY ve.start_date DESC LIMIT 40`,
+    // Try person_id
+    `SELECT pv.option, ve.motion_text, ve.start_date, ve.result, b.identifier as bill_id, b.title as bill_title
+     FROM personvote pv
+     JOIN voteevent ve ON ve.id = pv.vote_event_id
+     LEFT JOIN bill b ON ve.bill_id = b.id
+     WHERE pv.person_id = '${personId}'
+     ORDER BY ve.start_date DESC LIMIT 40`,
+    // Simplest: just personvote
+    `SELECT * FROM personvote WHERE voter_id = '${personId}' ORDER BY rowid DESC LIMIT 5`,
+    `SELECT * FROM personvote WHERE person_id = '${personId}' ORDER BY rowid DESC LIMIT 5`,
+  ];
+  for (const sql of queries) {
+    try {
+      const data = await chiSQL(sql);
+      if (data && data.length > 0) {
+        console.log('CHI votes loaded, count:', data.length, 'query:', sql.slice(0,60), 'first:', data[0]);
+        return data;
+      }
+    } catch(e) { console.warn('CHI vote query failed:', e.message, sql.slice(0,60)); }
+  }
+  // Log table schema for debugging
+  try {
+    const schema = await chiSQL(`SELECT sql FROM sqlite_master WHERE name='personvote'`);
+    console.log('personvote schema:', schema);
+  } catch(e) {}
+  return [];
+}
+
+// NYC: use Anthropic API to proxy Legistar vote data (Legistar is CORS-blocked)
+async function loadNYCVotes(memberId, memberName) {
+  // First try direct Legistar (works if they've enabled CORS)
+  try {
+    const url = `${NYC_LEGISTAR}/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc desc`;
+    const r = await fetch(url);
+    if (r.ok) {
+      const data = await r.json();
+      if (data && data.length > 0) {
+        console.log('NYC votes via direct Legistar:', data.length);
+        return { source: 'legistar', votes: data };
+      }
+    }
+  } catch(e) { console.warn('Direct Legistar failed (CORS):', e.message); }
+
+  // Fallback: use Anthropic API with web_search to find recent vote info
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{role:'user', content:
+          `Search for recent New York City Council votes by ${memberName} (District ${memberId}). Find their most recent roll call votes from legistar.council.nyc.gov or council.nyc.gov. Return ONLY a JSON array of objects with fields: date, bill, title, vote (yes/no/abstain), result. No explanation, just the JSON array. If you can't find specific votes, return [].`
+        }]
+      })
+    });
+    const d = await res.json();
+    const text = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+    // Try to parse JSON from response
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      const votes = JSON.parse(match[0]);
+      if (votes.length > 0) {
+        console.log('NYC votes via Claude search:', votes.length);
+        return { source: 'search', votes };
+      }
+    }
+  } catch(e) { console.warn('Claude vote search failed:', e.message); }
+
+  return { source: 'none', votes: [] };
+}
+
+// ══════════════════════════════════════════════════
 // NYC VIEW
 // ══════════════════════════════════════════════════
 async function showNYC(){
@@ -237,14 +324,10 @@ async function showNYC(){
   // Bills
   const sponsorBills=D.nyc_bills.filter(b=>(b.primary_sponsor||'').toLowerCase().includes(lastName));
 
-  // Votes — try Legistar API directly
-  let votes=[];
-  try{
-    const voteUrl=`${NYC_LEGISTAR}/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc desc&token=`;
-    const vr=await fetch(voteUrl);
-    if(vr.ok)votes=await vr.json();
-    console.log('NYC votes loaded:',votes.length,votes[0]);
-  }catch(e){console.warn('NYC Legistar votes failed:',e.message);}
+  // Votes — try Legistar direct, then Claude proxy
+  const voteResult = await loadNYCVotes(memberId, name);
+  const votes = voteResult.votes;
+  const voteSource = voteResult.source;
 
   window._billData=[];
   let html='';
@@ -272,11 +355,16 @@ async function showNYC(){
 
   // Votes column
   html+=`<div class="col"><div class="col-head">Vote history <span class="col-count">${votes.length}</span></div>`;
-  if(!votes.length)html+=`<div class="empty">Vote data requires a Legistar API token or is loading</div>`;
-  else votes.slice(0,25).forEach(v=>{
+  if(!votes.length)html+=`<div class="empty">Vote records not available — Legistar API may require a token</div>`;
+  else if(voteSource==='legistar') votes.slice(0,25).forEach(v=>{
     const option=(v.VoteValueName||'').toLowerCase();
     const cls=option.includes('aye')||option.includes('yes')?'yes':option.includes('no')||option.includes('nay')?'no':option.includes('abstain')||option.includes('excused')?'abs':'other';
     html+=`<div class="vote-row"><div class="vote-badge ${cls}">${v.VoteValueName||'?'}</div><div><div class="vote-title">${v.VoteEventItemMatterName||v.VoteEventItemMatterFile||'Vote'}</div><div class="vote-meta">${fmtDate(v.VoteLastModifiedUtc)} ${v.VoteEventItemMatterType?'· '+v.VoteEventItemMatterType:''}</div></div></div>`;
+  });
+  else votes.slice(0,25).forEach(v=>{
+    const option=(v.vote||'').toLowerCase();
+    const cls=option.includes('yes')||option.includes('aye')?'yes':option.includes('no')||option.includes('nay')?'no':'abs';
+    html+=`<div class="vote-row"><div class="vote-badge ${cls}">${v.vote||'?'}</div><div><div class="vote-title">${v.title||v.bill||'Vote'}</div><div class="vote-meta">${v.date||''} ${v.result?'· Result: '+v.result:''}</div></div></div>`;
   });
   html+=`</div></div>`;
 
@@ -296,7 +384,7 @@ async function showChi(){
 
   const [billsR,votesR,commsR]=await Promise.allSettled([
     chiSQL(`SELECT b.id, b.identifier, b.title, b.classification, b.updated_at FROM bill b JOIN billsponsorship bs ON bs.bill_id=b.id WHERE bs.person_id='${personId}' ORDER BY b.updated_at DESC LIMIT 30`),
-    chiSQL(`SELECT pv.option, pv.vote_event_id, ve.identifier as ve_id, ve.motion_text, ve.start_date, b.identifier as bill_id, b.title as bill_title FROM personvote pv JOIN voteevent ve ON ve.id=pv.vote_event_id LEFT JOIN bill b ON ve.bill_id=b.id WHERE pv.voter_id='${personId}' ORDER BY ve.start_date DESC LIMIT 30`),
+    loadChiVotes(personId),
     chiSQL(`SELECT DISTINCT o.name, m.role FROM membership m JOIN organization o ON o.id=m.organization_id WHERE m.person_id='${personId}' LIMIT 25`)
   ]);
 
@@ -334,9 +422,9 @@ async function showChi(){
   });
   html+=`</div>`;
 
-  // Votes
-  html+=`<div class="col"><div class="col-head">Vote history <span class="col-count">${votes.length}</span></div>`;
-  if(!votes.length)html+=`<div class="empty">No vote records found</div>`;
+  // Votes — these are divided (non-unanimous) roll call votes
+  html+=`<div class="col"><div class="col-head">Divided roll call votes <span class="col-count">${votes.length}</span></div>`;
+  if(!votes.length)html+=`<div class="empty">No divided vote records found — most Chicago legislation passes unanimously</div>`;
   else votes.forEach(v=>{
     const opt=(v.option||'').toLowerCase();
     const cls=opt.includes('yes')||opt.includes('aye')?'yes':opt.includes('no')||opt.includes('nay')?'no':opt.includes('abstain')||opt.includes('excused')||opt.includes('absent')?'abs':'other';
