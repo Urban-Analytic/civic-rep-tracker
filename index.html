@@ -259,9 +259,9 @@ async function loadChiVotes(personId) {
   return [];
 }
 
-// NYC: use Anthropic API to proxy Legistar vote data (Legistar is CORS-blocked)
+// NYC: use Anthropic API to proxy-fetch Legistar vote data (Legistar is CORS-blocked from browsers)
 async function loadNYCVotes(memberId, memberName) {
-  // First try direct Legistar (works if they've enabled CORS)
+  // First try direct Legistar (in case CORS works)
   try {
     const url = `${NYC_LEGISTAR}/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc desc`;
     const r = await fetch(url);
@@ -272,34 +272,43 @@ async function loadNYCVotes(memberId, memberName) {
         return { source: 'legistar', votes: data };
       }
     }
-  } catch(e) { console.warn('Direct Legistar failed (CORS):', e.message); }
+  } catch(e) { console.warn('Direct Legistar failed (CORS expected):', e.message); }
 
-  // Fallback: use Anthropic API with web_search to find recent vote info
+  // Use Claude as a server-side proxy to fetch the Legistar JSON
+  const legistarUrl = `https://webapi.legistar.com/v1/nyc/Persons/${memberId}/Votes?$top=30&$orderby=VoteLastModifiedUtc%20desc`;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        max_tokens: 4000,
         messages: [{role:'user', content:
-          `Search for recent New York City Council votes by ${memberName} (District ${memberId}). Find their most recent roll call votes from legistar.council.nyc.gov or council.nyc.gov. Return ONLY a JSON array of objects with fields: date, bill, title, vote (yes/no/abstain), result. No explanation, just the JSON array. If you can't find specific votes, return [].`
-        }]
+          `Fetch the JSON data from this URL and return it exactly as received: ${legistarUrl}
+
+Return ONLY the raw JSON array from the API response. No explanation, no markdown, no code fences. Just the JSON array starting with [ and ending with ]. If the fetch fails or returns no data, return exactly: []`
+        }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }]
       })
     });
     const d = await res.json();
     const text = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
-    // Try to parse JSON from response
+    console.log('Claude proxy response length:', text.length, 'preview:', text.slice(0,200));
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
-      const votes = JSON.parse(match[0]);
-      if (votes.length > 0) {
-        console.log('NYC votes via Claude search:', votes.length);
-        return { source: 'search', votes };
-      }
+      try {
+        const votes = JSON.parse(match[0]);
+        if (votes.length > 0) {
+          console.log('NYC votes via Claude proxy:', votes.length);
+          // Detect format: if it has VoteValueName it's raw Legistar, otherwise search results
+          if (votes[0].VoteValueName || votes[0].VoteEventItemMatterName) {
+            return { source: 'legistar', votes };
+          }
+          return { source: 'search', votes };
+        }
+      } catch(pe) { console.warn('JSON parse failed:', pe.message); }
     }
-  } catch(e) { console.warn('Claude vote search failed:', e.message); }
+  } catch(e) { console.warn('Claude proxy failed:', e.message); }
 
   return { source: 'none', votes: [] };
 }
